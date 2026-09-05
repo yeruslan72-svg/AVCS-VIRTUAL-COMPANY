@@ -14,7 +14,6 @@ import sys
 import os
 
 # Добавляем корневую папку проекта в sys.path
-# Это необходимо для корректного импорта модулей из папки core/
 root_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if root_path not in sys.path:
     sys.path.insert(0, root_path)
@@ -122,7 +121,21 @@ with tab1:
                 f"Altitude: {altitude} ft"
             ],
             "classification": "UNKNOWN",
-            "escalate": True
+            "escalate": True,
+            # --- Добавленные поля для департаментов ---
+            "current_heading": heading,
+            "current_speed": speed,
+            "situation": f"Unidentified drone detected at {position}",
+            "time_to_event": 2,
+            "action": "Monitor and track",
+            "authorized": False,
+            "decision_proposal": "Continue monitoring",
+            "evidence": [
+                f"Drone detected at {position}",
+                f"Heading: {heading}°",
+                f"Speed: {speed} kts",
+                f"Altitude: {altitude} ft"
+            ]
         }
         st.session_state.event_id = st.session_state.drone_data["event_id"]
         st.session_state.current_step = "processing"
