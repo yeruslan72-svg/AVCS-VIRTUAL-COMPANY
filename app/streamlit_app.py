@@ -40,6 +40,10 @@ from core.decision_engine import DecisionEngine
 from core.authority_gate import AuthorityGate
 from core.state_machine import StateMachine
 
+# --- НОВЫЕ ИМПОРТЫ ДЛЯ v0.2 ---
+from core.event_normalizer import EventNormalizer
+from core.risk_engine import RiskEngine
+
 
 # --- Настройка страницы ---
 st.set_page_config(
@@ -75,7 +79,7 @@ with st.sidebar:
     st.header("Architecture")
     st.caption("INCIDENT → DISPATCHER → 7 Dpts. → AGGREGATION → CONFLICT → DECISION → AUTHORITY → EXECUTION → RECORD")
     st.divider()
-    st.caption("Version: 0.1 — MVP")
+    st.caption("Version: 0.2 — Information Integrity Layer")
 
 # --- Основные вкладки ---
 tab1, tab2, tab3, tab4 = st.tabs(["📥 Incident Input", "⚙️ Processing", "📋 Decision", "📊 Record"])
@@ -119,6 +123,11 @@ with tab1:
                 "escalate": True
             }
 
+            # --- НОРМАЛИЗАЦИЯ СОБЫТИЯ (v0.2) ---
+            normalizer = EventNormalizer()
+            normalized_data = normalizer.normalize(event_data)
+            event_data = normalized_data
+
             st.session_state.event_data = event_data
             st.session_state.event_id = event_data["event_id"]
             st.session_state.current_step = "processing"
@@ -126,6 +135,9 @@ with tab1:
 
     if st.session_state.event_id:
         st.success(f"Event created: {st.session_state.event_id}")
+        if st.session_state.event_data and "critical_conditions" in st.session_state.event_data:
+            with st.expander("📋 Critical Conditions Extracted"):
+                st.json(st.session_state.event_data["critical_conditions"])
 
 
 # --- TAB 2: PROCESSING ---
@@ -160,33 +172,18 @@ with tab2:
             authority_gate = AuthorityGate()
             state_machine = StateMachine()
 
-            # --- Классифицируем инцидент на основе описания ---
-            incident_text = st.session_state.event_data.get("description", "").lower()
-            if "drone" in incident_text or "uav" in incident_text:
-                incident_type = "DRONE"
-            elif "hull" in incident_text or "breach" in incident_text or "water" in incident_text or "flood" in incident_text:
-                incident_type = "HULL_BREACH"
-            elif "fire" in incident_text or "smoke" in incident_text or "explosion" in incident_text:
-                incident_type = "FIRE"
-            elif "person" in incident_text or "man overboard" in incident_text or "casualty" in incident_text:
-                incident_type = "MAN_OVERBOARD"
-            elif "temperature" in incident_text or "pressure" in incident_text or "anomaly" in incident_text:
-                incident_type = "ANOMALY"
-            else:
-                incident_type = "GENERAL"
-
-            # --- Обогащаем данные для департаментов ---
+            # --- Подготавливаем данные для департаментов ---
             event_data = st.session_state.event_data.copy()
-            event_data["classification"] = incident_type
 
-            # --- Добавляем поля для NAVIGATOR, COMPASS, HELM, CAPTAIN ---
+            # Добавляем поля для департаментов
             event_data["situation"] = event_data.get("description", "Incident detected")
-            event_data["time_to_event"] = 5  # Будет переопределено департаментами
+            event_data["time_to_event"] = 5
             event_data["action"] = "Analyze and respond"
             event_data["authorized"] = False
             event_data["decision_proposal"] = "Awaiting assessment"
             event_data["evidence"] = [
-                f"Incident type: {incident_type}",
+                f"Event type: {event_data.get('event_type', 'UNKNOWN')}",
+                f"Severity: {event_data.get('severity', 'UNKNOWN')}",
                 f"Description: {event_data.get('description', '')[:100]}"
             ]
             event_data["current_heading"] = event_data.get("heading", 0)
@@ -228,11 +225,18 @@ with tab2:
             state_machine.aggregate()
             aggregated_state = aggregator.aggregate(department_results, st.session_state.event_id)
 
+            # --- ОЦЕНКА РИСКА (v0.2) ---
+            risk_engine = RiskEngine()
+            critical_conditions = event_data.get("critical_conditions", [])
+            risk_assessment = risk_engine.evaluate_risk(critical_conditions)
+            aggregated_state["risk_assessment"] = risk_assessment
+
             state_machine.detect_conflicts()
             conflict_result = conflict_detector.detect(aggregated_state)
 
             state_machine.formulate_decision()
             decision_proposal = decision_engine.formulate(aggregated_state, conflict_result)
+            decision_proposal["risk_assessment"] = risk_assessment  # Передаём риск в решение
 
             state_machine.wait_for_authority()
             authority_state = authority_gate.present_decision(decision_proposal)
@@ -261,6 +265,18 @@ with tab2:
     if st.session_state.aggregated_state:
         st.subheader("📊 Aggregated State")
         st.json(st.session_state.aggregated_state)
+
+        # --- Отображение оценки риска (v0.2) ---
+        if "risk_assessment" in st.session_state.aggregated_state:
+            st.subheader("⚠️ Risk Assessment")
+            risk_data = st.session_state.aggregated_state["risk_assessment"]
+            if risk_data.get("overall_risk") == "CRITICAL":
+                st.error(f"🚨 CRITICAL RISK: {risk_data.get('risk_count', 0)} risks identified")
+            elif risk_data.get("overall_risk") == "HIGH":
+                st.warning(f"⚠️ HIGH RISK: {risk_data.get('risk_count', 0)} risks identified")
+            else:
+                st.success(f"✅ LOW RISK: {risk_data.get('risk_count', 0)} risks identified")
+            st.json(risk_data)
 
     if st.session_state.conflict_result:
         st.subheader("⚠️ Conflict Detection")
