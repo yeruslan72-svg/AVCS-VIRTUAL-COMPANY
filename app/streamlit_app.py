@@ -146,7 +146,7 @@ with tab2:
 
     if st.session_state.current_step == "processing" and st.session_state.event_data:
         with st.spinner("Processing incident..."):
-            # --- Создаём департаменты ---
+            # --- Создаем департаменты ---
             lookout = LookoutDepartment()
             charts = ChartsDepartment()
             gyro = GyroDepartment()
@@ -155,7 +155,7 @@ with tab2:
             helm = HelmDepartment()
             captain = CaptainDepartment()
 
-            # --- Создаём диспетчер и регистрируем департаменты ---
+            # --- Создаем диспетчер и регистрируем департаменты ---
             dispatcher = Dispatcher()
             dispatcher.register_department(lookout)
             dispatcher.register_department(charts)
@@ -165,7 +165,7 @@ with tab2:
             dispatcher.register_department(helm)
             dispatcher.register_department(captain)
 
-            # --- Создаём остальные компоненты ---
+            # --- Создаем остальные компоненты ---
             aggregator = Aggregator()
             conflict_detector = ConflictDetector()
             decision_engine = DecisionEngine()
@@ -236,7 +236,7 @@ with tab2:
 
             state_machine.formulate_decision()
             decision_proposal = decision_engine.formulate(aggregated_state, conflict_result)
-            decision_proposal["risk_assessment"] = risk_assessment  # Передаём риск в решение
+            decision_proposal["risk_assessment"] = risk_assessment  # Передаем риск в решение
 
             state_machine.wait_for_authority()
             authority_state = authority_gate.present_decision(decision_proposal)
