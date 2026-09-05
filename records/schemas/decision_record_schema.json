@@ -1,0 +1,21 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["record_id", "event_id", "timestamp"],
+  "properties": {
+    "record_id": {"type": "string"},
+    "event_id": {"type": "string"},
+    "timestamp": {"type": "string", "format": "date-time"},
+    "scenario": {"type": "string"},
+    "incoming_information": {"type": "object"},
+    "dispatcher_routing": {"type": "object"},
+    "department_assessments": {"type": "object"},
+    "aggregation_state": {"type": "object"},
+    "detected_conflicts": {"type": "object"},
+    "decision_proposal": {"type": "object"},
+    "authority_state": {"type": "object"},
+    "authorization": {"type": "object"},
+    "execution": {"type": "object"},
+    "integrity": {"type": "object"}
+  }
+}
