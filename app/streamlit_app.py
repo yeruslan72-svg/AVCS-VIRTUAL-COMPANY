@@ -161,18 +161,15 @@ if not st.session_state.welcome_shown:
             designed for high-risk environments.<br><br>
             <span style="color: #666;">INCIDENT → DISPATCHER → 7 Dpts. → AGGREGATION → CONFLICT → DECISION → AUTHORITY → EXECUTION → RECORD</span>
         </div>
-        <form action="#" method="get">
-            <button class="welcome-button" type="submit" name="enter">▸ ENTER COMMAND CENTER</button>
-        </form>
-        <div class="welcome-version">Version 0.2 — Information Integrity Layer</div>
     </div>
     """, unsafe_allow_html=True)
 
-    # Проверка нажатия кнопки через query params
-    if st.query_params.get("enter"):
-        st.session_state.welcome_shown = True
-        st.query_params.clear()
-        st.rerun()
+    # --- КНОПКА ВХОДА (ИСПРАВЛЕННАЯ) ---
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        if st.button("▸ ENTER COMMAND CENTER", use_container_width=True, type="primary"):
+            st.session_state.welcome_shown = True
+            st.rerun()
     
     st.stop()
 
@@ -201,7 +198,13 @@ with st.sidebar:
     try:
         st.image("app/logo.png", width=200)
     except:
-        st.markdown("### 🧭 AVCS")
+        st.markdown("""
+        <div style="text-align: center; padding: 10px 0;">
+            <span style="font-size: 28px; font-weight: bold; color: #c9a84c;">🧭 AVCS</span>
+            <br>
+            <span style="font-size: 12px; color: #666; letter-spacing: 2px;">STRUCTURAL INTEGRITY SYSTEM</span>
+        </div>
+        """, unsafe_allow_html=True)
     
     st.divider()
     
@@ -381,7 +384,7 @@ with tab2:
 
             state_machine.formulate_decision()
             decision_proposal = decision_engine.formulate(aggregated_state, conflict_result)
-            decision_proposal["risk_assessment"] = risk_assessment  # Передаём риск в решение
+            decision_proposal["risk_assessment"] = risk_assessment
 
             state_machine.wait_for_authority()
             authority_state = authority_gate.present_decision(decision_proposal)
