@@ -1,0 +1,15 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["event_id", "object", "timestamp"],
+  "properties": {
+    "event_id": {"type": "string"},
+    "object": {"type": "string"},
+    "position": {"type": "string"},
+    "heading": {"type": "number"},
+    "speed": {"type": "number"},
+    "altitude": {"type": "number"},
+    "timestamp": {"type": "string", "format": "date-time"},
+    "observations": {"type": "array", "items": {"type": "string"}}
+  }
+}
