@@ -34,20 +34,22 @@ class RiskEngine:
         """
         risks = []
         overall_risk = "LOW"
+        has_critical = False
+        has_high = False
 
         for condition in critical_conditions:
             severity = condition.get("severity", "LOW")
             condition_type = condition.get("condition", "UNKNOWN")
 
             if severity == "CRITICAL":
-                overall_risk = "CRITICAL"
+                has_critical = True
                 risks.append({
                     "condition": condition_type,
                     "severity": "CRITICAL",
                     "description": f"{condition_type} detected — immediate action required"
                 })
-            elif severity == "HIGH" and overall_risk != "CRITICAL":
-                overall_risk = "HIGH"
+            elif severity == "HIGH":
+                has_high = True
                 risks.append({
                     "condition": condition_type,
                     "severity": "HIGH",
@@ -60,11 +62,18 @@ class RiskEngine:
                     "description": f"{condition_type} detected — monitor"
                 })
 
+        # Определяем общий риск
+        if has_critical:
+            overall_risk = "CRITICAL"
+        elif has_high:
+            overall_risk = "HIGH"
+
         return {
             "overall_risk": overall_risk,
             "risks": risks,
             "risk_count": len(risks),
-            "has_critical_risk": any(r["severity"] == "CRITICAL" for r in risks),
+            "has_critical_risk": has_critical,
+            "has_high_risk": has_high,
             "status": "COMPLETED"
         }
 
