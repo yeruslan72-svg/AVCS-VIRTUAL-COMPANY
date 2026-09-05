@@ -1,23 +1,17 @@
 """
 AVCS VIRTUAL COMPANY
 Streamlit UI — Operational Dashboard
-
-FUNCTION:
-- Display operational state
-- Show Department assessments
-- Present Decision Proposal
-- Accept human authorization
-- Display AVCS Record
 """
+
+import sys
+import os
+
+# Добавляем корневую папку проекта в sys.path
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import streamlit as st
 import json
 from datetime import datetime
-import sys
-import os
-
-# Add project root to path
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from core.departments import (
     LookoutDepartment,
@@ -98,7 +92,6 @@ with tab1:
         separation_required = st.number_input("Required Separation (NM)", min_value=0.0, max_value=5.0, value=0.5)
 
     if st.button("🚀 Process Event", type="primary"):
-        # Build input data
         st.session_state.drone_data = {
             "event_id": f"EVT-{datetime.utcnow().strftime('%Y%m%d')}-001",
             "object": object_type,
@@ -112,9 +105,10 @@ with tab1:
             "timestamp": datetime.utcnow().isoformat() + "Z",
             "observations": [
                 f"Object detected at {position}",
-                f"Range: 1.2 NM",
                 f"Altitude: {altitude} ft"
-            ]
+            ],
+            "classification": "UNKNOWN",
+            "escalate": True
         }
         st.session_state.event_id = st.session_state.drone_data["event_id"]
         st.session_state.current_step = "processing"
@@ -129,7 +123,6 @@ with tab2:
 
     if st.session_state.current_step == "processing" and st.session_state.drone_data:
         with st.spinner("Processing event..."):
-            # Initialize components
             lookout = LookoutDepartment()
             charts = ChartsDepartment()
             gyro = GyroDepartment()
@@ -153,14 +146,11 @@ with tab2:
             authority_gate = AuthorityGate()
             state_machine = StateMachine()
 
-            # Start state machine
             state_machine.start(st.session_state.event_id)
 
-            # Dispatch event
             state_machine.dispatch()
             dispatcher_results = dispatcher.process_incoming_event(st.session_state.drone_data)
 
-            # Process departments
             state_machine.process()
             task_packets = dispatcher_results.get("task_packets", [])
             department_results = {}
@@ -185,23 +175,18 @@ with tab2:
                     result = {"error": f"Unknown department: {dept_name}"}
                 department_results[dept_name] = result
 
-            # Aggregate
             state_machine.aggregate()
             aggregated_state = aggregator.aggregate(department_results, st.session_state.event_id)
 
-            # Detect conflicts
             state_machine.detect_conflicts()
             conflict_result = conflict_detector.detect(aggregated_state)
 
-            # Formulate decision
             state_machine.formulate_decision()
             decision_proposal = decision_engine.formulate(aggregated_state, conflict_result)
 
-            # Present to authority gate
             state_machine.wait_for_authority()
             authority_state = authority_gate.present_decision(decision_proposal)
 
-            # Store results
             st.session_state.dispatcher_results = dispatcher_results
             st.session_state.department_results = department_results
             st.session_state.aggregated_state = aggregated_state
@@ -212,7 +197,6 @@ with tab2:
 
             st.rerun()
 
-    # Display processing results
     if st.session_state.department_results:
         st.subheader("Department Assessments")
         for dept, result in st.session_state.department_results.items():
@@ -278,7 +262,6 @@ with tab4:
         else:
             st.info("Decision Cycle Completed — Rejected")
 
-        # Build record
         record = {
             "event_id": st.session_state.event_id,
             "timestamp": datetime.utcnow().isoformat() + "Z",
@@ -292,7 +275,6 @@ with tab4:
 
         st.json(record)
 
-        # Download button
         st.download_button(
             label="📥 Download AVCS Record",
             data=json.dumps(record, indent=2),
