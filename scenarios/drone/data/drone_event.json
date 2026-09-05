@@ -1,0 +1,25 @@
+{
+  "event_id": "EVT-20260905-001",
+  "object": "Unidentified Drone",
+  "position": "1.2 NM, Bearing 270°",
+  "heading": 90,
+  "speed": 25,
+  "altitude": 200,
+  "threat_heading": 100,
+  "threat_speed": 30,
+  "separation_required": 0.5,
+  "timestamp": "2026-09-05T14:23:00Z",
+  "observations": [
+    "Object detected at 1.2 NM",
+    "Bearing: 270° true",
+    "Altitude: 200 ft",
+    "Heading: 090°",
+    "Speed: 25 knots",
+    "No transponder signal",
+    "No IFF response",
+    "Not on filed flight plans",
+    "Position within restricted airspace (Class D)"
+  ],
+  "classification": "UNKNOWN",
+  "escalate": true
+}
