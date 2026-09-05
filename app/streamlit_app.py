@@ -52,6 +52,132 @@ st.set_page_config(
     layout="wide"
 )
 
+# --- ПРИВЕТСТВЕННАЯ СТРАНИЦА (МИЛИТАРИ-СТИЛЬ) ---
+if "welcome_shown" not in st.session_state:
+    st.session_state.welcome_shown = False
+
+if not st.session_state.welcome_shown:
+    st.markdown("""
+    <style>
+        .welcome-container {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            padding: 60px 40px;
+            border-radius: 15px;
+            border: 2px solid #c9a84c;
+            box-shadow: 0 0 40px rgba(201, 168, 76, 0.2);
+            text-align: center;
+            margin-top: 40px;
+        }
+        .welcome-title {
+            font-size: 48px;
+            font-weight: 700;
+            color: #c9a84c;
+            text-shadow: 0 0 30px rgba(201, 168, 76, 0.3);
+            letter-spacing: 4px;
+            text-transform: uppercase;
+            font-family: 'Courier New', monospace;
+        }
+        .welcome-subtitle {
+            font-size: 20px;
+            color: #8a8a8a;
+            margin-top: 10px;
+            font-family: 'Courier New', monospace;
+            letter-spacing: 2px;
+        }
+        .welcome-divider {
+            border: 1px solid #c9a84c;
+            margin: 30px auto;
+            width: 60%;
+            opacity: 0.3;
+        }
+        .welcome-text {
+            color: #c0c0c0;
+            font-size: 16px;
+            line-height: 1.8;
+            font-family: 'Courier New', monospace;
+            max-width: 700px;
+            margin: 0 auto 30px auto;
+        }
+        .welcome-status {
+            display: inline-block;
+            background: #1a3a2a;
+            color: #00ff88;
+            padding: 8px 24px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-family: 'Courier New', monospace;
+            border: 1px solid #00ff88;
+            letter-spacing: 1px;
+            margin-bottom: 20px;
+        }
+        .welcome-button {
+            background: transparent;
+            color: #c9a84c;
+            border: 2px solid #c9a84c;
+            padding: 12px 40px;
+            border-radius: 5px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            font-family: 'Courier New', monospace;
+        }
+        .welcome-button:hover {
+            background: #c9a84c;
+            color: #1a1a2e;
+        }
+        .welcome-version {
+            color: #555;
+            font-size: 12px;
+            margin-top: 20px;
+            font-family: 'Courier New', monospace;
+        }
+        .welcome-badge {
+            display: inline-block;
+            background: rgba(201, 168, 76, 0.1);
+            border: 1px solid #c9a84c;
+            color: #c9a84c;
+            padding: 4px 16px;
+            border-radius: 4px;
+            font-size: 12px;
+            letter-spacing: 1px;
+            font-family: 'Courier New', monospace;
+        }
+    </style>
+    """, unsafe_allow_html=True)
+
+    st.markdown("""
+    <div class="welcome-container">
+        <div class="welcome-badge">AVCS — STRUCTURAL INTEGRITY SYSTEM</div>
+        <div style="height: 20px;"></div>
+        <div class="welcome-title">🧭 OPERATIONAL<br>DECISION ARCHITECTURE</div>
+        <div class="welcome-subtitle">AI-Driven Incident Management System</div>
+        <hr class="welcome-divider">
+        <div class="welcome-status">● SYSTEM READY — AWAITING COMMAND</div>
+        <div class="welcome-text">
+            <strong style="color: #c9a84c;">AVCS VIRTUAL COMPANY</strong> is an operational decision architecture<br>
+            designed for high-risk environments.<br><br>
+            <span style="color: #666;">INCIDENT → DISPATCHER → 7 Dpts. → AGGREGATION → CONFLICT → DECISION → AUTHORITY → EXECUTION → RECORD</span>
+        </div>
+        <form action="#" method="get">
+            <button class="welcome-button" type="submit" name="enter">▸ ENTER COMMAND CENTER</button>
+        </form>
+        <div class="welcome-version">Version 0.2 — Information Integrity Layer</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # Проверка нажатия кнопки через query params
+    if st.query_params.get("enter"):
+        st.session_state.welcome_shown = True
+        st.query_params.clear()
+        st.rerun()
+    
+    st.stop()
+
+# --- ОСНОВНОЙ ИНТЕРФЕЙС ---
+
 st.title("🧭 AVCS VIRTUAL COMPANY")
 st.subheader("AI-Driven Operational Decision Architecture")
 
@@ -71,6 +197,14 @@ if "initialized" not in st.session_state:
 
 # --- Sidebar ---
 with st.sidebar:
+    # --- Логотип AVCS ---
+    try:
+        st.image("app/logo.png", width=200)
+    except:
+        st.markdown("### 🧭 AVCS")
+    
+    st.divider()
+    
     st.header("System Status")
     if st.session_state.event_id:
         st.info(f"Event: {st.session_state.event_id}")
@@ -80,6 +214,17 @@ with st.sidebar:
     st.caption("INCIDENT → DISPATCHER → 7 Dpts. → AGGREGATION → CONFLICT → DECISION → AUTHORITY → EXECUTION → RECORD")
     st.divider()
     st.caption("Version: 0.2 — Information Integrity Layer")
+
+    # --- Кнопка сброса события ---
+    st.divider()
+    if st.button("🔄 Reset Event", use_container_width=True):
+        for key in ["event_id", "event_data", "dispatcher_results", "department_results", 
+                    "aggregated_state", "conflict_result", "decision_proposal", 
+                    "authority_state", "authorized", "current_step"]:
+            if key in st.session_state:
+                del st.session_state[key]
+        st.session_state.current_step = "input"
+        st.rerun()
 
 # --- Основные вкладки ---
 tab1, tab2, tab3, tab4 = st.tabs(["📥 Incident Input", "⚙️ Processing", "📋 Decision", "📊 Record"])
@@ -146,7 +291,7 @@ with tab2:
 
     if st.session_state.current_step == "processing" and st.session_state.event_data:
         with st.spinner("Processing incident..."):
-            # --- Создаем департаменты ---
+            # --- Создаём департаменты ---
             lookout = LookoutDepartment()
             charts = ChartsDepartment()
             gyro = GyroDepartment()
@@ -155,7 +300,7 @@ with tab2:
             helm = HelmDepartment()
             captain = CaptainDepartment()
 
-            # --- Создаем диспетчер и регистрируем департаменты ---
+            # --- Создаём диспетчер и регистрируем департаменты ---
             dispatcher = Dispatcher()
             dispatcher.register_department(lookout)
             dispatcher.register_department(charts)
@@ -165,7 +310,7 @@ with tab2:
             dispatcher.register_department(helm)
             dispatcher.register_department(captain)
 
-            # --- Создаем остальные компоненты ---
+            # --- Создаём остальные компоненты ---
             aggregator = Aggregator()
             conflict_detector = ConflictDetector()
             decision_engine = DecisionEngine()
@@ -236,7 +381,7 @@ with tab2:
 
             state_machine.formulate_decision()
             decision_proposal = decision_engine.formulate(aggregated_state, conflict_result)
-            decision_proposal["risk_assessment"] = risk_assessment  # Передаем риск в решение
+            decision_proposal["risk_assessment"] = risk_assessment  # Передаём риск в решение
 
             state_machine.wait_for_authority()
             authority_state = authority_gate.present_decision(decision_proposal)
