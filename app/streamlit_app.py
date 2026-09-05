@@ -1,13 +1,13 @@
 """
 AVCS VIRTUAL COMPANY
-Streamlit UI — Operational Dashboard
+Streamlit UI — Operational Decision Dashboard
 
 FUNCTION:
-- Display operational state
-- Show Department assessments
-- Present Decision Proposal
-- Accept human authorization
-- Display AVCS Record
+- Free-form incident input
+- Automatic classification
+- Dynamic department processing
+- Human authorization
+- AVCS Record generation
 """
 
 import sys
@@ -21,6 +21,7 @@ if root_path not in sys.path:
 import streamlit as st
 import json
 from datetime import datetime
+import re
 
 # Импорт департаментов и других компонентов
 from core.departments import (
@@ -48,14 +49,14 @@ st.set_page_config(
 )
 
 st.title("🧭 AVCS VIRTUAL COMPANY")
-st.subheader("AI-Driven Functional Operational Decision Architecture")
+st.subheader("AI-Driven Operational Decision Architecture")
 
 # --- Инициализация сессии ---
 if "initialized" not in st.session_state:
     st.session_state.initialized = True
     st.session_state.event_id = None
     st.session_state.current_step = "input"
-    st.session_state.drone_data = None
+    st.session_state.event_data = None
     st.session_state.dispatcher_results = None
     st.session_state.department_results = None
     st.session_state.aggregated_state = None
@@ -72,74 +73,56 @@ with st.sidebar:
     st.write(f"Step: {st.session_state.current_step}")
     st.divider()
     st.header("Architecture")
-    st.caption("INFORMATION → DISPATCHER → 7 Dpts. → AGGREGATION → CONFLICT → DECISION → AUTHORITY → EXECUTION → RECORD")
+    st.caption("INCIDENT → DISPATCHER → 7 Dpts. → AGGREGATION → CONFLICT → DECISION → AUTHORITY → EXECUTION → RECORD")
     st.divider()
     st.caption("Version: 0.1 — MVP")
 
 # --- Основные вкладки ---
-tab1, tab2, tab3, tab4 = st.tabs(["📥 Input", "⚙️ Processing", "📋 Decision", "📊 Record"])
+tab1, tab2, tab3, tab4 = st.tabs(["📥 Incident Input", "⚙️ Processing", "📋 Decision", "📊 Record"])
 
 
-# --- TAB 1: INPUT ---
+# --- TAB 1: INCIDENT INPUT ---
 with tab1:
-    st.header("Incoming Event")
+    st.header("Incident Input")
+    st.caption("Describe any incident — the system will classify and process it automatically.")
 
-    event_type = st.selectbox(
-        "Event Type",
-        ["Drone Detection", "Anomaly Detection", "Environmental Alert"],
-        key="event_type"
+    # --- Свободное описание инцидента ---
+    incident_description = st.text_area(
+        "Incident Description",
+        height=150,
+        placeholder="Describe the incident in detail...\n\nExample: 'Hull breach in compartment 3, water ingress 50 tons/hour, vessel listing 12 degrees, position 35°N 45°W, weather storm force 5'"
     )
 
+    # --- Дополнительные структурированные поля (опционально) ---
     col1, col2 = st.columns(2)
-
     with col1:
-        object_type = st.text_input("Object Type", "Unidentified Drone")
-        position = st.text_input("Position", "1.2 NM, Bearing 270°")
-        heading = st.number_input("Heading (degrees)", min_value=0, max_value=360, value=90)
-        speed = st.number_input("Speed (knots)", min_value=0, max_value=100, value=25)
-
+        object_type = st.text_input("Object / Vessel (optional)", placeholder="e.g., Tanker, FPSO, Plant")
+        position = st.text_input("Position (optional)", placeholder="e.g., 35°N 45°W")
     with col2:
-        altitude = st.number_input("Altitude (ft)", min_value=0, value=200)
-        threat_heading = st.number_input("Threat Heading (degrees)", min_value=0, max_value=360, value=100)
-        threat_speed = st.number_input("Threat Speed (knots)", min_value=0, max_value=100, value=30)
-        separation_required = st.number_input("Required Separation (NM)", min_value=0.0, max_value=5.0, value=0.5)
+        heading = st.number_input("Heading (optional)", min_value=0, max_value=360, value=0)
+        speed = st.number_input("Speed (optional)", min_value=0, max_value=100, value=0)
 
-    if st.button("🚀 Process Event", type="primary"):
-        st.session_state.drone_data = {
-            "event_id": f"EVT-{datetime.utcnow().strftime('%Y%m%d')}-001",
-            "object": object_type,
-            "position": position,
-            "heading": heading,
-            "speed": speed,
-            "altitude": altitude,
-            "threat_heading": threat_heading,
-            "threat_speed": threat_speed,
-            "separation_required": separation_required,
-            "timestamp": datetime.utcnow().isoformat() + "Z",
-            "observations": [
-                f"Object detected at {position}",
-                f"Altitude: {altitude} ft"
-            ],
-            "classification": "UNKNOWN",
-            "escalate": True,
-            # --- Добавленные поля для департаментов ---
-            "current_heading": heading,
-            "current_speed": speed,
-            "situation": f"Unidentified drone detected at {position}",
-            "time_to_event": 2,
-            "action": "Monitor and track",
-            "authorized": False,
-            "decision_proposal": "Continue monitoring",
-            "evidence": [
-                f"Drone detected at {position}",
-                f"Heading: {heading}°",
-                f"Speed: {speed} kts",
-                f"Altitude: {altitude} ft"
-            ]
-        }
-        st.session_state.event_id = st.session_state.drone_data["event_id"]
-        st.session_state.current_step = "processing"
-        st.rerun()
+    # --- Кнопка обработки ---
+    if st.button("🚀 Process Incident", type="primary"):
+        if not incident_description.strip():
+            st.error("Please describe the incident.")
+        else:
+            # --- Формируем данные для обработки ---
+            event_data = {
+                "event_id": f"EVT-{datetime.utcnow().strftime('%Y%m%d')}-001",
+                "description": incident_description,
+                "object": object_type if object_type else "Unknown",
+                "position": position if position else "Unknown",
+                "heading": heading,
+                "speed": speed,
+                "timestamp": datetime.utcnow().isoformat() + "Z",
+                "escalate": True
+            }
+
+            st.session_state.event_data = event_data
+            st.session_state.event_id = event_data["event_id"]
+            st.session_state.current_step = "processing"
+            st.rerun()
 
     if st.session_state.event_id:
         st.success(f"Event created: {st.session_state.event_id}")
@@ -149,8 +132,8 @@ with tab1:
 with tab2:
     st.header("Processing Pipeline")
 
-    if st.session_state.current_step == "processing" and st.session_state.drone_data:
-        with st.spinner("Processing event..."):
+    if st.session_state.current_step == "processing" and st.session_state.event_data:
+        with st.spinner("Processing incident..."):
             # --- Создаём департаменты ---
             lookout = LookoutDepartment()
             charts = ChartsDepartment()
@@ -177,11 +160,46 @@ with tab2:
             authority_gate = AuthorityGate()
             state_machine = StateMachine()
 
+            # --- Классифицируем инцидент на основе описания ---
+            incident_text = st.session_state.event_data.get("description", "").lower()
+            if "drone" in incident_text or "uav" in incident_text:
+                incident_type = "DRONE"
+            elif "hull" in incident_text or "breach" in incident_text or "water" in incident_text or "flood" in incident_text:
+                incident_type = "HULL_BREACH"
+            elif "fire" in incident_text or "smoke" in incident_text or "explosion" in incident_text:
+                incident_type = "FIRE"
+            elif "person" in incident_text or "man overboard" in incident_text or "casualty" in incident_text:
+                incident_type = "MAN_OVERBOARD"
+            elif "temperature" in incident_text or "pressure" in incident_text or "anomaly" in incident_text:
+                incident_type = "ANOMALY"
+            else:
+                incident_type = "GENERAL"
+
+            # --- Обогащаем данные для департаментов ---
+            event_data = st.session_state.event_data.copy()
+            event_data["classification"] = incident_type
+
+            # --- Добавляем поля для NAVIGATOR, COMPASS, HELM, CAPTAIN ---
+            event_data["situation"] = event_data.get("description", "Incident detected")
+            event_data["time_to_event"] = 5  # Будет переопределено департаментами
+            event_data["action"] = "Analyze and respond"
+            event_data["authorized"] = False
+            event_data["decision_proposal"] = "Awaiting assessment"
+            event_data["evidence"] = [
+                f"Incident type: {incident_type}",
+                f"Description: {event_data.get('description', '')[:100]}"
+            ]
+            event_data["current_heading"] = event_data.get("heading", 0)
+            event_data["current_speed"] = event_data.get("speed", 0)
+            event_data["threat_heading"] = 0
+            event_data["threat_speed"] = 0
+            event_data["separation_required"] = 0.5
+
             # --- Запускаем обработку ---
             state_machine.start(st.session_state.event_id)
 
             state_machine.dispatch()
-            dispatcher_results = dispatcher.process_incoming_event(st.session_state.drone_data)
+            dispatcher_results = dispatcher.process_incoming_event(event_data)
 
             state_machine.process()
             task_packets = dispatcher_results.get("task_packets", [])
