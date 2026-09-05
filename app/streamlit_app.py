@@ -1,18 +1,29 @@
 """
 AVCS VIRTUAL COMPANY
 Streamlit UI — Operational Dashboard
+
+FUNCTION:
+- Display operational state
+- Show Department assessments
+- Present Decision Proposal
+- Accept human authorization
+- Display AVCS Record
 """
 
 import sys
 import os
 
 # Добавляем корневую папку проекта в sys.path
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# Это необходимо для корректного импорта модулей из папки core/
+root_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if root_path not in sys.path:
+    sys.path.insert(0, root_path)
 
 import streamlit as st
 import json
 from datetime import datetime
 
+# Импорт департаментов и других компонентов
 from core.departments import (
     LookoutDepartment,
     ChartsDepartment,
@@ -30,6 +41,7 @@ from core.authority_gate import AuthorityGate
 from core.state_machine import StateMachine
 
 
+# --- Настройка страницы ---
 st.set_page_config(
     page_title="AVCS Virtual Company",
     page_icon="🧭",
@@ -39,20 +51,21 @@ st.set_page_config(
 st.title("🧭 AVCS VIRTUAL COMPANY")
 st.subheader("AI-Driven Functional Operational Decision Architecture")
 
-# Initialize session state
+# --- Инициализация сессии ---
 if "initialized" not in st.session_state:
     st.session_state.initialized = True
     st.session_state.event_id = None
     st.session_state.current_step = "input"
     st.session_state.drone_data = None
     st.session_state.dispatcher_results = None
+    st.session_state.department_results = None
     st.session_state.aggregated_state = None
     st.session_state.conflict_result = None
     st.session_state.decision_proposal = None
     st.session_state.authority_state = None
     st.session_state.authorized = None
 
-# Create sidebar with status
+# --- Sidebar ---
 with st.sidebar:
     st.header("System Status")
     if st.session_state.event_id:
@@ -64,8 +77,9 @@ with st.sidebar:
     st.divider()
     st.caption("Version: 0.1 — MVP")
 
-# Main content
+# --- Основные вкладки ---
 tab1, tab2, tab3, tab4 = st.tabs(["📥 Input", "⚙️ Processing", "📋 Decision", "📊 Record"])
+
 
 # --- TAB 1: INPUT ---
 with tab1:
@@ -117,12 +131,14 @@ with tab1:
     if st.session_state.event_id:
         st.success(f"Event created: {st.session_state.event_id}")
 
+
 # --- TAB 2: PROCESSING ---
 with tab2:
     st.header("Processing Pipeline")
 
     if st.session_state.current_step == "processing" and st.session_state.drone_data:
         with st.spinner("Processing event..."):
+            # --- Создаём департаменты ---
             lookout = LookoutDepartment()
             charts = ChartsDepartment()
             gyro = GyroDepartment()
@@ -131,6 +147,7 @@ with tab2:
             helm = HelmDepartment()
             captain = CaptainDepartment()
 
+            # --- Создаём диспетчер и регистрируем департаменты ---
             dispatcher = Dispatcher()
             dispatcher.register_department(lookout)
             dispatcher.register_department(charts)
@@ -140,12 +157,14 @@ with tab2:
             dispatcher.register_department(helm)
             dispatcher.register_department(captain)
 
+            # --- Создаём остальные компоненты ---
             aggregator = Aggregator()
             conflict_detector = ConflictDetector()
             decision_engine = DecisionEngine()
             authority_gate = AuthorityGate()
             state_machine = StateMachine()
 
+            # --- Запускаем обработку ---
             state_machine.start(st.session_state.event_id)
 
             state_machine.dispatch()
@@ -187,6 +206,7 @@ with tab2:
             state_machine.wait_for_authority()
             authority_state = authority_gate.present_decision(decision_proposal)
 
+            # --- Сохраняем результаты ---
             st.session_state.dispatcher_results = dispatcher_results
             st.session_state.department_results = department_results
             st.session_state.aggregated_state = aggregated_state
@@ -197,6 +217,7 @@ with tab2:
 
             st.rerun()
 
+    # --- Отображение результатов обработки ---
     if st.session_state.department_results:
         st.subheader("Department Assessments")
         for dept, result in st.session_state.department_results.items():
@@ -217,6 +238,7 @@ with tab2:
         else:
             st.success("No conflicts detected")
         st.json(st.session_state.conflict_result)
+
 
 # --- TAB 3: DECISION ---
 with tab3:
@@ -251,6 +273,7 @@ with tab3:
             st.session_state.current_step = "completed"
         elif st.session_state.authorized is False:
             st.error("❌ Decision Rejected")
+
 
 # --- TAB 4: RECORD ---
 with tab4:
