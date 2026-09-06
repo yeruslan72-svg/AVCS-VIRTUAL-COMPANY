@@ -8,6 +8,8 @@ Detects:
 - Uncertainty (possible, suspected, maybe)
 - Context (previous, historical, reported)
 - Confidence (high, medium, low)
+
+Version: v0.3.2 — Semantic Window
 """
 
 import re
@@ -66,7 +68,7 @@ class SemanticAnalyzer:
 
     def analyze(self, text: str, keyword: str) -> Dict[str, Any]:
         """
-        Analyze text for a specific keyword.
+        Analyze text for a specific keyword using Semantic Window.
         
         Returns:
             {
@@ -92,26 +94,37 @@ class SemanticAnalyzer:
                 "uncertainty_found": False
             }
 
-        # Extract context around keyword (50 chars before, 50 after)
-        start = max(0, keyword_pos - 50)
-        end = min(len(text), keyword_pos + 50)
-        context = text[start:end]
+        # --- SEMANTIC WINDOW ---
+        # 50 chars before keyword + keyword + 50 chars after keyword
+        window_start = max(0, keyword_pos - 50)
+        window_end = min(len(text), keyword_pos + len(keyword) + 50)
+        window_text = text[window_start:window_end]
 
-        # Check for negation BEFORE the keyword
+        # --- CHECK NEGATION IN WINDOW ---
         negation_found = False
         for pattern in self.NEGATION_PATTERNS:
-            if re.search(pattern, text[max(0, keyword_pos - 30):keyword_pos]):
+            if re.search(pattern, window_text):
                 negation_found = True
                 break
 
-        # Check for uncertainty BEFORE the keyword
+        # --- CHECK UNCERTAINTY IN WINDOW ---
         uncertainty_found = False
         for pattern in self.UNCERTAINTY_PATTERNS:
-            if re.search(pattern, text[max(0, keyword_pos - 30):keyword_pos]):
+            if re.search(pattern, window_text):
                 uncertainty_found = True
                 break
 
-        # Determine polarity
+        # --- CHECK CONTEXT IN WINDOW ---
+        context_type = None
+        for ctx_type, patterns in self.CONTEXT_PATTERNS.items():
+            for pattern in patterns:
+                if re.search(pattern, window_text):
+                    context_type = ctx_type.upper()
+                    break
+            if context_type:
+                break
+
+        # --- DETERMINE POLARITY ---
         if negation_found:
             polarity = "NEGATIVE"
         elif uncertainty_found:
@@ -119,17 +132,7 @@ class SemanticAnalyzer:
         else:
             polarity = "POSITIVE"
 
-        # Determine context
-        context_type = None
-        for ctx_type, patterns in self.CONTEXT_PATTERNS.items():
-            for pattern in patterns:
-                if re.search(pattern, text[max(0, keyword_pos - 50):keyword_pos]):
-                    context_type = ctx_type.upper()
-                    break
-            if context_type:
-                break
-
-        # Determine confidence
+        # --- DETERMINE CONFIDENCE ---
         confidence = 0.8  # Default
         if negation_found:
             confidence = 0.95
@@ -148,5 +151,5 @@ class SemanticAnalyzer:
             "confidence": confidence,
             "negation_found": negation_found,
             "uncertainty_found": uncertainty_found,
-            "context_text": context
+            "context_text": window_text.strip()
         }
