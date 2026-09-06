@@ -1,3 +1,4 @@
+```python
 """
 AVCS VIRTUAL COMPANY
 Event Normalizer
@@ -6,285 +7,889 @@ EXTRACT critical conditions from raw incident description
 PRESERVE all critical information
 PASS structured conditions to Dispatcher
 
-Version: v0.3.6 — With debug info in UI
+Architecture:
+    RAW INCIDENT
+          ↓
+    EVENT NORMALIZER
+          ↓
+    SEMANTIC ANALYZER
+          ↓
+    SEMANTIC STATE
+          ↓
+    CRITICAL CONDITIONS
+          ↓
+    DISPATCHER
+
+Version: v0.3.7 — Semantic Analyzer Integration
 """
 
-from typing import Dict, Any, List, Tuple
-from datetime import datetime
-import re
+from typing import Dict, Any, List
+from datetime import datetime, timezone
+
+from core.semantic_analyzer import SemanticAnalyzer
 
 
 class EventNormalizer:
     """
     Event Normalizer extracts critical conditions from incident descriptions.
-    Now with built-in semantic detection (negation, uncertainty, confirmation).
+
+    IMPORTANT ARCHITECTURAL RULE:
+
+    EventNormalizer does NOT independently interpret semantic meaning.
+
+    Semantic meaning is determined by SemanticAnalyzer.
+
+    EventNormalizer:
+        1. identifies candidate critical conditions
+        2. sends them to SemanticAnalyzer
+        3. preserves the semantic result
+        4. excludes only explicitly negative / historical conditions
+        5. preserves uncertain conditions
+        6. passes structured conditions to Dispatcher
+
+    Semantic states:
+
+        POSITIVE
+            Condition is asserted as present.
+
+        NEGATIVE
+            Condition is explicitly denied / ruled out.
+
+        NEUTRAL + HIGH uncertainty
+            Condition is possible / suspected / uncertain.
+
+        PREVIOUS
+            Condition belongs to a previous / historical state.
+
+    Critical principle:
+
+        UNCERTAIN != ABSENT
+
+    An uncertain critical condition must NOT be silently discarded.
     """
 
+    # ------------------------------------------------------------------
+    # CRITICAL CONDITION DICTIONARY
+    # ------------------------------------------------------------------
+
     CRITICAL_KEYWORDS = {
-        "fire": {"severity": "CRITICAL", "keywords": ["fire", "flame", "burning", "ignition"]},
-        "smoke": {"severity": "HIGH", "keywords": ["smoke", "fume"]},
-        "evacuation": {"severity": "CRITICAL", "keywords": ["evacuate", "evacuating", "abandon"]},
-        "temperature": {"severity": "HIGH", "keywords": ["temperature", "heat", "overheat"]},
-        "oil_spill": {"severity": "CRITICAL", "keywords": ["oil", "spill", "leak", "pollution", "environmental"]},
-        "hull_breach": {"severity": "CRITICAL", "keywords": ["water ingress", "breach", "hull", "flood"]},
-        "man_overboard": {"severity": "CRITICAL", "keywords": ["overboard", "man overboard", "MOB"]},
-        "gas_leak": {"severity": "CRITICAL", "keywords": ["gas leak", "methane", "toxic"]},
-        "drone": {"severity": "HIGH", "keywords": ["drone", "uav", "unidentified"]},
-        "collision": {"severity": "CRITICAL", "keywords": ["collision", "impact", "strike"]},
-        "explosion": {"severity": "CRITICAL", "keywords": ["explosion", "blast", "boom"]},
+        "fire": {
+            "severity": "CRITICAL",
+            "keywords": [
+                "fire",
+                "flame",
+                "burning",
+                "ignition",
+            ],
+        },
+
+        "smoke": {
+            "severity": "HIGH",
+            "keywords": [
+                "smoke",
+                "fume",
+            ],
+        },
+
+        "evacuation": {
+            "severity": "CRITICAL",
+            "keywords": [
+                "evacuate",
+                "evacuating",
+                "abandon",
+            ],
+        },
+
+        "temperature": {
+            "severity": "HIGH",
+            "keywords": [
+                "temperature",
+                "heat",
+                "overheat",
+            ],
+        },
+
+        "oil_spill": {
+            "severity": "CRITICAL",
+            "keywords": [
+                "oil spill",
+                "spill",
+                "leak",
+                "pollution",
+                "environmental",
+            ],
+        },
+
+        "hull_breach": {
+            "severity": "CRITICAL",
+            "keywords": [
+                "water ingress",
+                "breach",
+                "hull",
+                "flood",
+            ],
+        },
+
+        "man_overboard": {
+            "severity": "CRITICAL",
+            "keywords": [
+                "man overboard",
+                "overboard",
+                "MOB",
+            ],
+        },
+
+        "gas_leak": {
+            "severity": "CRITICAL",
+            "keywords": [
+                "gas leak",
+                "methane",
+                "toxic",
+            ],
+        },
+
+        "drone": {
+            "severity": "HIGH",
+            "keywords": [
+                "drone",
+                "UAV",
+                "unidentified",
+            ],
+        },
+
+        "collision": {
+            "severity": "CRITICAL",
+            "keywords": [
+                "collision",
+                "impact",
+                "strike",
+            ],
+        },
+
+        "explosion": {
+            "severity": "CRITICAL",
+            "keywords": [
+                "explosion",
+                "blast",
+                "boom",
+            ],
+        },
     }
+
+    # ------------------------------------------------------------------
+    # INITIALIZATION
+    # ------------------------------------------------------------------
 
     def __init__(self, config: Dict[str, Any] = None):
         self.config = config or {}
-        self.critical_conditions = []
-        self.last_debug = {}
+
+        self.critical_conditions: List[Dict[str, Any]] = []
+
+        self.semantic_analyzer = SemanticAnalyzer()
+
+        self.last_debug: Dict[str, Any] = {}
+
+    # ------------------------------------------------------------------
+    # MAIN NORMALIZATION
+    # ------------------------------------------------------------------
 
     def normalize(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Normalize raw incident data with semantic analysis.
+        Normalize raw incident data.
+
+        Input:
+            {
+                "description": "...",
+                "object": "...",
+                "position": "...",
+                ...
+            }
+
+        Output:
+            normalized event with structured semantic conditions.
         """
+
         description = input_data.get("description", "")
-        object_type = input_data.get("object", "Unknown")
-        position = input_data.get("position", "Unknown")
 
-        critical_conditions, debug_info = self._extract_critical_conditions(description)
-        self.last_debug = debug_info
+        object_type = input_data.get(
+            "object",
+            "Unknown"
+        )
 
-        event_type = self._determine_event_type(critical_conditions)
-        severity = self._determine_overall_severity(critical_conditions)
-        is_emergency = severity in ["CRITICAL", "HIGH"]
+        position = input_data.get(
+            "position",
+            "Unknown"
+        )
 
-        semantic_summary = self._build_semantic_summary(critical_conditions)
+        # --------------------------------------------------------------
+        # EXTRACT CONDITIONS
+        # --------------------------------------------------------------
 
-        normalized_data = {
-            "event_id": input_data.get("event_id", f"EVT-{datetime.utcnow().strftime('%Y%m%d')}-001"),
-            "raw_description": description,
-            "object": object_type,
-            "position": position,
-            "timestamp": datetime.utcnow().isoformat() + "Z",
-            "event_type": event_type,
-            "severity": severity,
-            "is_emergency": is_emergency,
-            "critical_conditions": critical_conditions,
-            "critical_conditions_count": len(critical_conditions),
-            "has_critical": any(c.get("severity") == "CRITICAL" for c in critical_conditions),
-            "has_high": any(c.get("severity") == "HIGH" for c in critical_conditions),
-            "semantic_summary": semantic_summary,
-            "debug_info": debug_info,
-            "status": "NORMALIZED"
-        }
+        critical_conditions, debug_info = (
+            self._extract_critical_conditions(description)
+        )
 
         self.critical_conditions = critical_conditions
-        return {**input_data, **normalized_data}
+        self.last_debug = debug_info
 
-    def _extract_critical_conditions(self, text: str) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
-        """
-        Extract critical conditions with built-in semantic detection.
-        Returns: (conditions, debug_info)
-        """
-        conditions = []
-        debug_info = {
-            "checks": [],
-            "keyword_results": {}
+        # --------------------------------------------------------------
+        # EVENT TYPE
+        # --------------------------------------------------------------
+
+        event_type = self._determine_event_type(
+            critical_conditions
+        )
+
+        # --------------------------------------------------------------
+        # OVERALL SEVERITY
+        # --------------------------------------------------------------
+
+        severity = self._determine_overall_severity(
+            critical_conditions
+        )
+
+        is_emergency = severity in [
+            "CRITICAL",
+            "HIGH",
+        ]
+
+        # --------------------------------------------------------------
+        # SEMANTIC SUMMARY
+        # --------------------------------------------------------------
+
+        semantic_summary = self._build_semantic_summary(
+            critical_conditions
+        )
+
+        # --------------------------------------------------------------
+        # TIMESTAMP
+        # --------------------------------------------------------------
+
+        timestamp = self._utc_timestamp()
+
+        # --------------------------------------------------------------
+        # EVENT ID
+        # --------------------------------------------------------------
+
+        event_id = input_data.get(
+            "event_id",
+            f"EVT-{datetime.now(timezone.utc).strftime('%Y%m%d')}-001"
+        )
+
+        # --------------------------------------------------------------
+        # NORMALIZED DATA
+        # --------------------------------------------------------------
+
+        normalized_data = {
+            "event_id": event_id,
+
+            "raw_description": description,
+
+            "object": object_type,
+
+            "position": position,
+
+            "timestamp": timestamp,
+
+            "event_type": event_type,
+
+            "severity": severity,
+
+            "is_emergency": is_emergency,
+
+            "critical_conditions": critical_conditions,
+
+            "critical_conditions_count": len(
+                critical_conditions
+            ),
+
+            "has_critical": any(
+                c.get("severity") == "CRITICAL"
+                for c in critical_conditions
+            ),
+
+            "has_high": any(
+                c.get("severity") == "HIGH"
+                for c in critical_conditions
+            ),
+
+            "semantic_summary": semantic_summary,
+
+            "debug_info": debug_info,
+
+            "status": "NORMALIZED",
         }
+
+        # Preserve original input and add normalized data.
+        return {
+            **input_data,
+            **normalized_data,
+        }
+
+    # ------------------------------------------------------------------
+    # CRITICAL CONDITION EXTRACTION
+    # ------------------------------------------------------------------
+
+    def _extract_critical_conditions(
+        self,
+        text: str,
+    ):
+        """
+        Extract critical conditions and apply SemanticAnalyzer.
+
+        IMPORTANT:
+
+            NEGATIVE  -> exclude
+            PREVIOUS  -> exclude
+            UNCERTAIN -> preserve
+            POSITIVE  -> preserve
+            CONFIRMED  -> preserve
+
+        This method does NOT perform independent semantic interpretation.
+        """
+
+        conditions: List[Dict[str, Any]] = []
+
+        debug_info: Dict[str, Any] = {
+            "semantic_analyzer": "ACTIVE",
+            "semantic_analyzer_version": "v0.3.x",
+            "checks": [],
+            "keyword_results": {},
+        }
+
+        if not text:
+            return conditions, debug_info
 
         text_lower = text.lower()
 
-        negation_patterns = [
-            r"\bno\s+", r"\bnot\s+", r"\bwithout\s+",
-            r"\bnever\s+", r"\bruled\s+out\s*", r"\bexcluded\s*",
-            r"\babsent\s*", r"\bnot\s+detected\s*", r"\bno\s+evidence\s*"
-        ]
-
-        confirmation_patterns = [
-            r"\bdetected\b", r"\bconfirmed\b", r"\bverified\b", r"\bvalidated\b"
-        ]
-
-        uncertainty_patterns = [
-            r"\bsuspected\s+", r"\bpossible\s+", r"\bprobable\s+",
-            r"\bprobably\s+", r"\bmaybe\s+", r"\bpotential\s+",
-            r"\bappears?\s*", r"\bseems?\s*", r"\bindicates?\s*",
-            r"\bsuggests?\s*"
-        ]
-
-        context_patterns = {
-            "previous": [r"\bprevious\s+", r"\bprior\s+", r"\bhistorical\s+", r"\bearlier\s+"],
-            "reported": [r"\breported\s+", r"\bstated\s+", r"\baccording to\s+"],
-            "confirmed": [r"\bconfirmed\s+", r"\bverified\s+", r"\bvalidated\s+"],
-        }
+        # --------------------------------------------------------------
+        # LOOP THROUGH CRITICAL CONDITIONS
+        # --------------------------------------------------------------
 
         for condition_type, config in self.CRITICAL_KEYWORDS.items():
+
             for keyword in config["keywords"]:
-                if keyword not in text_lower:
+
+                keyword_lower = keyword.lower()
+
+                if keyword_lower not in text_lower:
                     continue
 
-                position = text_lower.find(keyword)
+                # ------------------------------------------------------
+                # SEMANTIC ANALYSIS
+                # ------------------------------------------------------
 
-                window_start = max(0, position - 50)
-                window_end = min(len(text), position + len(keyword) + 50)
-                window_text = text[window_start:window_end].lower()
+                analysis = self.semantic_analyzer.analyze(
+                    text,
+                    keyword,
+                )
+
+                # ------------------------------------------------------
+                # DEBUG RECORD
+                # ------------------------------------------------------
 
                 check_result = {
+                    "condition": condition_type.upper(),
                     "keyword": keyword,
-                    "window_text": window_text[:100],
-                    "negation_found": False,
-                    "confirmation_found": False,
-                    "uncertainty_found": False,
-                    "context_type": None,
-                    "action": "unknown"
+
+                    "detected": analysis.get(
+                        "detected",
+                        False,
+                    ),
+
+                    "polarity": analysis.get(
+                        "polarity"
+                    ),
+
+                    "uncertainty": analysis.get(
+                        "uncertainty"
+                    ),
+
+                    "context": analysis.get(
+                        "context"
+                    ),
+
+                    "confidence": analysis.get(
+                        "confidence",
+                        0.0,
+                    ),
+
+                    "negation_found": analysis.get(
+                        "negation_found",
+                        False,
+                    ),
+
+                    "uncertainty_found": analysis.get(
+                        "uncertainty_found",
+                        False,
+                    ),
+
+                    "context_text": analysis.get(
+                        "context_text",
+                        "",
+                    ),
+
+                    "action": "unknown",
                 }
 
-                # --- NEGATION ---
-                negation_found = False
-                for pattern in negation_patterns:
-                    if re.search(pattern, window_text):
-                        negation_found = True
-                        break
+                # ------------------------------------------------------
+                # ANALYZER DID NOT DETECT
+                # ------------------------------------------------------
 
-                if negation_found:
-                    check_result["negation_found"] = True
-                    check_result["action"] = "skipped_negation"
-                    debug_info["checks"].append(check_result)
+                if not analysis.get("detected", False):
+
+                    check_result["action"] = (
+                        "skipped_not_detected"
+                    )
+
+                    debug_info["checks"].append(
+                        check_result
+                    )
+
                     continue
 
-                # --- CONTEXT ---
-                context_type = None
-                for ctx_type, patterns in context_patterns.items():
-                    for pattern in patterns:
-                        if re.search(pattern, window_text):
-                            context_type = ctx_type.upper()
-                            break
-                    if context_type:
-                        break
+                # ------------------------------------------------------
+                # NEGATIVE CONDITION
+                # ------------------------------------------------------
 
-                check_result["context_type"] = context_type
+                if analysis.get("polarity") == "NEGATIVE":
 
-                if context_type == "PREVIOUS":
-                    check_result["action"] = "skipped_previous"
-                    debug_info["checks"].append(check_result)
+                    check_result["action"] = (
+                        "skipped_negative"
+                    )
+
+                    debug_info["checks"].append(
+                        check_result
+                    )
+
+                    # Explicitly denied condition must not become
+                    # an active critical condition.
                     continue
 
-                # --- CONFIRMATION ---
-                confirmation_found = False
-                for pattern in confirmation_patterns:
-                    if re.search(pattern, window_text):
-                        confirmation_found = True
-                        break
+                # ------------------------------------------------------
+                # PREVIOUS / HISTORICAL CONDITION
+                # ------------------------------------------------------
 
-                check_result["confirmation_found"] = confirmation_found
+                if analysis.get("context") == "PREVIOUS":
 
-                if confirmation_found:
-                    check_result["action"] = "added_confirmed"
-                    severity = config["severity"]
-                    polarity = "POSITIVE"
-                    uncertainty = None
-                    confidence = 0.8
+                    check_result["action"] = (
+                        "skipped_previous"
+                    )
+
+                    debug_info["checks"].append(
+                        check_result
+                    )
+
+                    # Historical condition is preserved in debug
+                    # information but not treated as active.
+                    continue
+
+                # ------------------------------------------------------
+                # SEMANTIC STATE
+                # ------------------------------------------------------
+
+                polarity = analysis.get(
+                    "polarity",
+                    "POSITIVE",
+                )
+
+                uncertainty = analysis.get(
+                    "uncertainty"
+                )
+
+                confidence = analysis.get(
+                    "confidence",
+                    0.8,
+                )
+
+                # ------------------------------------------------------
+                # SEVERITY
+                # ------------------------------------------------------
+
+                severity = config["severity"]
+
+                # ------------------------------------------------------
+                # UNCERTAIN CRITICAL CONDITION
+                # ------------------------------------------------------
+
+                if uncertainty == "HIGH":
+
+                    # We DO NOT discard the condition.
+
+                    # We reduce operational severity by one level
+                    # only where appropriate.
+
+                    if severity == "CRITICAL":
+                        severity = "HIGH"
+
+                    elif severity == "HIGH":
+                        severity = "MEDIUM"
+
+                    check_result["action"] = (
+                        "added_uncertain"
+                    )
+
+                # ------------------------------------------------------
+                # CONFIRMED / POSITIVE CONDITION
+                # ------------------------------------------------------
+
                 else:
-                    # --- UNCERTAINTY ---
-                    uncertainty_found = False
-                    for pattern in uncertainty_patterns:
-                        if re.search(pattern, window_text):
-                            uncertainty_found = True
-                            break
 
-                    check_result["uncertainty_found"] = uncertainty_found
+                    check_result["action"] = (
+                        "added_active"
+                    )
 
-                    if uncertainty_found:
-                        check_result["action"] = "skipped_uncertainty"
-                        debug_info["checks"].append(check_result)
-                        continue
-                    else:
-                        check_result["action"] = "added_default"
-                        severity = config["severity"]
-                        polarity = "POSITIVE"
-                        uncertainty = None
-                        confidence = 0.8
+                # ------------------------------------------------------
+                # CONTEXT
+                # ------------------------------------------------------
 
-                start = max(0, position - 30)
-                end = min(len(text), position + 50)
-                context = text[start:end].strip()
+                context_type = analysis.get(
+                    "context"
+                )
 
-                conditions.append({
-                    "condition": condition_type.upper(),
-                    "severity": severity,
-                    "keyword": keyword,
-                    "context": context,
-                    "polarity": polarity,
-                    "confidence": confidence,
-                    "uncertainty": uncertainty,
-                    "negation_found": False,
-                    "uncertainty_found": uncertainty_found if not confirmation_found else False,
-                    "timestamp": datetime.utcnow().isoformat() + "Z",
-                    "source": "INCIDENT_INPUT",
-                    "status": "ACTIVE"
-                })
+                # ------------------------------------------------------
+                # CONTEXT SNIPPET
+                # ------------------------------------------------------
 
-                debug_info["checks"].append(check_result)
+                position = text_lower.find(
+                    keyword_lower
+                )
+
+                start = max(
+                    0,
+                    position - 30,
+                )
+
+                end = min(
+                    len(text),
+                    position + len(keyword) + 50,
+                )
+
+                context = text[
+                    start:end
+                ].strip()
+
+                # ------------------------------------------------------
+                # CONDITION RECORD
+                # ------------------------------------------------------
+
+                condition = {
+
+                    "condition":
+                        condition_type.upper(),
+
+                    "severity":
+                        severity,
+
+                    "keyword":
+                        keyword,
+
+                    "context":
+                        context,
+
+                    "polarity":
+                        polarity,
+
+                    "confidence":
+                        confidence,
+
+                    "uncertainty":
+                        uncertainty,
+
+                    "context_type":
+                        context_type,
+
+                    "negation_found":
+                        analysis.get(
+                            "negation_found",
+                            False,
+                        ),
+
+                    "uncertainty_found":
+                        analysis.get(
+                            "uncertainty_found",
+                            False,
+                        ),
+
+                    "semantic_context":
+                        analysis.get(
+                            "context_text",
+                            context,
+                        ),
+
+                    "timestamp":
+                        self._utc_timestamp(),
+
+                    "source":
+                        "INCIDENT_INPUT",
+
+                    "status":
+                        "ACTIVE",
+                }
+
+                conditions.append(condition)
+
+                # ------------------------------------------------------
+                # STORE DEBUG
+                # ------------------------------------------------------
+
+                debug_info["checks"].append(
+                    check_result
+                )
+
+                debug_info[
+                    "keyword_results"
+                ][keyword] = condition
+
+                # Only one keyword per condition type.
                 break
 
         return conditions, debug_info
 
-    def _build_semantic_summary(self, conditions: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """Build a summary of semantic information from all conditions."""
+    # ------------------------------------------------------------------
+    # SEMANTIC SUMMARY
+    # ------------------------------------------------------------------
+
+    def _build_semantic_summary(
+        self,
+        conditions: List[Dict[str, Any]],
+    ) -> Dict[str, Any]:
+        """
+        Build semantic summary.
+
+        The summary preserves:
+            - polarity distribution
+            - uncertainty distribution
+            - confidence
+            - negation presence
+            - uncertainty presence
+        """
+
         if not conditions:
+
             return {
                 "total_conditions": 0,
                 "polarities": {},
                 "uncertainties": [],
-                "average_confidence": 0.0
+                "contexts": {},
+                "average_confidence": 0.0,
+                "has_negation": False,
+                "has_uncertainty": False,
             }
 
-        polarities = {}
-        uncertainties = []
+        polarities: Dict[str, int] = {}
+
+        uncertainties: List[str] = []
+
+        contexts: Dict[str, int] = {}
+
         total_confidence = 0.0
 
-        for cond in conditions:
-            polarity = cond.get("polarity", "UNKNOWN")
-            polarities[polarity] = polarities.get(polarity, 0) + 1
+        for condition in conditions:
 
-            if cond.get("uncertainty"):
-                uncertainties.append(cond.get("uncertainty"))
+            polarity = condition.get(
+                "polarity",
+                "UNKNOWN",
+            )
 
-            total_confidence += cond.get("confidence", 0.8)
+            polarities[polarity] = (
+                polarities.get(
+                    polarity,
+                    0,
+                ) + 1
+            )
 
-        avg_confidence = total_confidence / len(conditions)
+            uncertainty = condition.get(
+                "uncertainty"
+            )
+
+            if uncertainty:
+                uncertainties.append(
+                    uncertainty
+                )
+
+            context_type = condition.get(
+                "context_type"
+            )
+
+            if context_type:
+
+                contexts[context_type] = (
+                    contexts.get(
+                        context_type,
+                        0,
+                    ) + 1
+                )
+
+            total_confidence += condition.get(
+                "confidence",
+                0.8,
+            )
+
+        average_confidence = (
+            total_confidence /
+            len(conditions)
+        )
 
         return {
-            "total_conditions": len(conditions),
-            "polarities": polarities,
-            "uncertainties": uncertainties,
-            "average_confidence": avg_confidence,
-            "has_negation": polarities.get("NEGATIVE", 0) > 0,
-            "has_uncertainty": len(uncertainties) > 0
+
+            "total_conditions":
+                len(conditions),
+
+            "polarities":
+                polarities,
+
+            "uncertainties":
+                uncertainties,
+
+            "contexts":
+                contexts,
+
+            "average_confidence":
+                round(
+                    average_confidence,
+                    3,
+                ),
+
+            "has_negation":
+                polarities.get(
+                    "NEGATIVE",
+                    0,
+                ) > 0,
+
+            "has_uncertainty":
+                len(uncertainties) > 0,
         }
 
-    def _determine_event_type(self, conditions: List[Dict[str, Any]]) -> str:
-        """Determine event type based on conditions."""
+    # ------------------------------------------------------------------
+    # EVENT TYPE
+    # ------------------------------------------------------------------
+
+    def _determine_event_type(
+        self,
+        conditions: List[Dict[str, Any]],
+    ) -> str:
+        """
+        Determine primary event type.
+
+        Priority:
+            1. CRITICAL
+            2. HIGH
+            3. MEDIUM
+            4. first available condition
+            5. GENERAL
+        """
+
         if not conditions:
             return "GENERAL"
 
         for condition in conditions:
-            if condition.get("severity") == "CRITICAL":
-                return condition["condition"]
+
+            if condition.get(
+                "severity"
+            ) == "CRITICAL":
+
+                return condition[
+                    "condition"
+                ]
 
         for condition in conditions:
-            if condition.get("severity") == "HIGH":
-                return condition["condition"]
 
-        return conditions[0]["condition"]
+            if condition.get(
+                "severity"
+            ) == "HIGH":
 
-    def _determine_overall_severity(self, conditions: List[Dict[str, Any]]) -> str:
-        """Determine overall severity based on critical conditions."""
-        if any(c.get("severity") == "CRITICAL" for c in conditions):
+                return condition[
+                    "condition"
+                ]
+
+        for condition in conditions:
+
+            if condition.get(
+                "severity"
+            ) == "MEDIUM":
+
+                return condition[
+                    "condition"
+                ]
+
+        return conditions[0][
+            "condition"
+        ]
+
+    # ------------------------------------------------------------------
+    # OVERALL SEVERITY
+    # ------------------------------------------------------------------
+
+    def _determine_overall_severity(
+        self,
+        conditions: List[Dict[str, Any]],
+    ) -> str:
+        """
+        Determine overall event severity.
+        """
+
+        if any(
+            c.get("severity") == "CRITICAL"
+            for c in conditions
+        ):
             return "CRITICAL"
-        if any(c.get("severity") == "HIGH" for c in conditions):
+
+        if any(
+            c.get("severity") == "HIGH"
+            for c in conditions
+        ):
             return "HIGH"
+
+        if any(
+            c.get("severity") == "MEDIUM"
+            for c in conditions
+        ):
+            return "MEDIUM"
+
+        if conditions:
+            return "LOW"
+
         return "LOW"
 
-    def get_critical_conditions(self) -> List[Dict[str, Any]]:
-        """Return critical conditions."""
+    # ------------------------------------------------------------------
+    # UTC TIMESTAMP
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _utc_timestamp() -> str:
+        """
+        Return ISO-8601 UTC timestamp.
+        """
+
+        return (
+            datetime.now(timezone.utc)
+            .isoformat()
+            .replace(
+                "+00:00",
+                "Z",
+            )
+        )
+
+    # ------------------------------------------------------------------
+    # PUBLIC ACCESSORS
+    # ------------------------------------------------------------------
+
+    def get_critical_conditions(
+        self,
+    ) -> List[Dict[str, Any]]:
+        """
+        Return latest extracted critical conditions.
+        """
+
         return self.critical_conditions
 
-    def get_last_debug(self) -> Dict[str, Any]:
-        """Return last debug info."""
+    def get_last_debug(
+        self,
+    ) -> Dict[str, Any]:
+        """
+        Return latest semantic debug information.
+        """
+
         return self.last_debug
+```
