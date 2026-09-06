@@ -1,13 +1,6 @@
 """
 AVCS VIRTUAL COMPANY
 Incident Registry — Хранилище всех инцидентов
-
-FUNCTION:
-- Сохранять все обработанные инциденты
-- Присваивать уникальные ID
-- Автоматически удалять записи старше 30 дней
-- Просматривать историю
-- Получать статистику
 """
 
 import json
@@ -18,10 +11,6 @@ from dateutil import parser
 
 
 class IncidentRegistry:
-    """
-    Incident Registry хранит историю всех инцидентов.
-    """
-
     def __init__(self, storage_path: str = "data/incidents.json", retention_days: int = 30):
         self.storage_path = storage_path
         self.retention_days = retention_days
@@ -31,7 +20,6 @@ class IncidentRegistry:
         self._clean_old_records()
 
     def _load(self):
-        """Загрузить инциденты из файла."""
         if os.path.exists(self.storage_path):
             try:
                 with open(self.storage_path, "r", encoding="utf-8") as f:
@@ -48,7 +36,6 @@ class IncidentRegistry:
             self._counter = 1
 
     def _save(self):
-        """Сохранить инциденты в файл."""
         try:
             os.makedirs(os.path.dirname(self.storage_path), exist_ok=True)
             with open(self.storage_path, "w", encoding="utf-8") as f:
@@ -61,7 +48,6 @@ class IncidentRegistry:
             print(f"[INCIDENT_REGISTRY] ERROR saving: {e}")
 
     def _clean_old_records(self):
-        """Удалить записи старше retention_days."""
         if not self.incidents:
             return
         
@@ -90,7 +76,6 @@ class IncidentRegistry:
             self._save()
 
     def generate_event_id(self) -> str:
-        """Сгенерировать уникальный Event ID."""
         event_id = f"EVT-{datetime.utcnow().strftime('%Y%m%d')}-{self._counter:03d}"
         self._counter += 1
         self._save()
@@ -98,11 +83,8 @@ class IncidentRegistry:
         return event_id
 
     def add_incident(self, incident_data: Dict[str, Any]) -> str:
-        """Добавить новый инцидент в реестр."""
         event_id = incident_data.get("event_id") or self.generate_event_id()
-        print(f"[INCIDENT_REGISTRY] ========================================")
         print(f"[INCIDENT_REGISTRY] Adding incident: {event_id}")
-        print(f"[INCIDENT_REGISTRY] Current incidents before add: {len(self.incidents)}")
         
         incident = {
             "event_id": event_id,
@@ -119,25 +101,19 @@ class IncidentRegistry:
         }
         
         self.incidents.append(incident)
-        print(f"[INCIDENT_REGISTRY] Incidents after append: {len(self.incidents)}")
-        
         self._save()
-        print(f"[INCIDENT_REGISTRY] ========================================")
         return event_id
 
     def get_all_incidents(self) -> List[Dict[str, Any]]:
-        """Получить все инциденты."""
         return self.incidents
 
     def get_incident(self, event_id: str) -> Optional[Dict[str, Any]]:
-        """Получить инцидент по ID."""
         for incident in self.incidents:
             if incident.get("event_id") == event_id:
                 return incident
         return None
 
     def get_statistics(self) -> Dict[str, Any]:
-        """Получить статистику по инцидентам."""
         total = len(self.incidents)
         by_type = {}
         by_severity = {}
@@ -160,11 +136,9 @@ class IncidentRegistry:
         }
 
     def get_next_event_id(self) -> str:
-        """Получить следующий доступный Event ID."""
         return f"EVT-{datetime.utcnow().strftime('%Y%m%d')}-{self._counter:03d}"
 
     def clear_old_records(self, days: int = None) -> int:
-        """Принудительная очистка записей старше указанного количества дней."""
         if days is None:
             days = self.retention_days
         
@@ -191,7 +165,6 @@ class IncidentRegistry:
         return removed
 
     def clear_all(self) -> int:
-        """Очистить все записи."""
         count = len(self.incidents)
         self.incidents = []
         self._save()
