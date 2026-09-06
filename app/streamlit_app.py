@@ -191,7 +191,13 @@ if "initialized" not in st.session_state:
     st.session_state.decision_proposal = None
     st.session_state.authority_state = None
     st.session_state.authorized = None
+    
+    # --- Поля ввода (привязаны к session_state) ---
     st.session_state.incident_text = ""
+    st.session_state.object_type = ""
+    st.session_state.position = ""
+    st.session_state.heading = 0
+    st.session_state.speed = 0
 
 # --- Sidebar ---
 with st.sidebar:
@@ -218,8 +224,13 @@ with st.sidebar:
     # --- Кнопка сброса события ---
     st.divider()
     if st.button("🔄 Reset Event", use_container_width=True):
-        # Очищаем поле ввода
+        # Очищаем все поля ввода
         st.session_state.incident_text = ""
+        st.session_state.object_type = ""
+        st.session_state.position = ""
+        st.session_state.heading = 0
+        st.session_state.speed = 0
+        
         # Удаляем все ключи события
         for key in ["event_id", "event_data", "dispatcher_results", "department_results", 
                     "aggregated_state", "conflict_result", "decision_proposal", 
@@ -249,19 +260,41 @@ with tab1:
     # --- Дополнительные структурированные поля (опционально) ---
     col1, col2 = st.columns(2)
     with col1:
-        object_type = st.text_input("Object / Vessel (optional)", placeholder="e.g., Tanker, FPSO, Plant")
-        position = st.text_input("Position (optional)", placeholder="e.g., 35°N 45°W")
+        object_type = st.text_input(
+            "Object / Vessel (optional)",
+            value=st.session_state.object_type,
+            placeholder="e.g., Tanker, FPSO, Plant"
+        )
+        position = st.text_input(
+            "Position (optional)",
+            value=st.session_state.position,
+            placeholder="e.g., 35°N 45°W"
+        )
     with col2:
-        heading = st.number_input("Heading (optional)", min_value=0, max_value=360, value=0)
-        speed = st.number_input("Speed (optional)", min_value=0, max_value=100, value=0)
+        heading = st.number_input(
+            "Heading (optional)",
+            min_value=0,
+            max_value=360,
+            value=st.session_state.heading
+        )
+        speed = st.number_input(
+            "Speed (optional)",
+            min_value=0,
+            max_value=100,
+            value=st.session_state.speed
+        )
 
     # --- Кнопка обработки ---
     if st.button("🚀 Process Incident", type="primary"):
         if not incident_description.strip():
             st.error("Please describe the incident.")
         else:
-            # Сохраняем текст в session_state
+            # Сохраняем все поля в session_state
             st.session_state.incident_text = incident_description
+            st.session_state.object_type = object_type
+            st.session_state.position = position
+            st.session_state.heading = heading
+            st.session_state.speed = speed
 
             # --- Формируем данные для обработки ---
             event_data = {
