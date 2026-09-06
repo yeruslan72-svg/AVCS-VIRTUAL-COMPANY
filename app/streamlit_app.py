@@ -8,6 +8,7 @@ FUNCTION:
 - Dynamic department processing
 - Human authorization
 - AVCS Record generation
+- Incident Registry with history and drift analysis
 """
 
 import sys
@@ -43,6 +44,9 @@ from core.state_machine import StateMachine
 # --- НОВЫЕ ИМПОРТЫ ДЛЯ v0.2 ---
 from core.event_normalizer import EventNormalizer
 from core.risk_engine import RiskEngine
+
+# --- НОВЫЙ ИМПОРТ ДЛЯ РЕЕСТРА ---
+from records.incident_registry import IncidentRegistry
 
 
 # --- Настройка страницы ---
@@ -221,27 +225,34 @@ with st.sidebar:
     st.divider()
     st.caption("Version: 0.2 — Information Integrity Layer")
 
-    # --- Кнопка сброса события ---
+    # --- Кнопка сброса события (очищает поля, НЕ реестр) ---
     st.divider()
     if st.button("🔄 Reset Event", use_container_width=True):
-        # Очищаем все поля ввода
+        # Очищаем поля ввода
         st.session_state.incident_text = ""
         st.session_state.object_type = ""
         st.session_state.position = ""
         st.session_state.heading = 0
         st.session_state.speed = 0
         
-        # Удаляем все ключи события
-        for key in ["event_id", "event_data", "dispatcher_results", "department_results", 
+        # Удаляем только текущую сессию, НЕ реестр
+        for key in ["event_data", "dispatcher_results", "department_results", 
                     "aggregated_state", "conflict_result", "decision_proposal", 
                     "authority_state", "authorized", "current_step"]:
             if key in st.session_state:
                 del st.session_state[key]
+        
         st.session_state.current_step = "input"
         st.rerun()
 
 # --- Основные вкладки ---
-tab1, tab2, tab3, tab4 = st.tabs(["📥 Incident Input", "⚙️ Processing", "📋 Decision", "📊 Record"])
+tab1, tab2, tab3, tab4, tab5 = st.tabs([
+    "📥 Incident Input",
+    "⚙️ Processing",
+    "📋 Decision",
+    "📊 Record",
+    "📋 Incident Registry"
+])
 
 
 # --- TAB 1: INCIDENT INPUT ---
@@ -296,9 +307,12 @@ with tab1:
             st.session_state.heading = heading
             st.session_state.speed = speed
 
-            # --- Формируем данные для обработки ---
+            # --- ФОРМИРУЕМ ДАННЫЕ ДЛЯ ОБРАБОТКИ ---
+            registry = IncidentRegistry()
+            event_id = registry.generate_event_id()
+
             event_data = {
-                "event_id": f"EVT-{datetime.utcnow().strftime('%Y%m%d')}-001",
+                "event_id": event_id,
                 "description": incident_description,
                 "object": object_type if object_type else "Unknown",
                 "position": position if position else "Unknown",
@@ -312,6 +326,9 @@ with tab1:
             normalizer = EventNormalizer()
             normalized_data = normalizer.normalize(event_data)
             event_data = normalized_data
+
+            # --- СОХРАНЯЕМ В РЕЕСТР ---
+            registry.add_incident(event_data)
 
             st.session_state.event_data = event_data
             st.session_state.event_id = event_data["event_id"]
@@ -435,6 +452,15 @@ with tab2:
             st.session_state.authority_state = authority_state
             st.session_state.current_step = "authority"
 
+            # --- Обновляем реестр с результатами ---
+            registry = IncidentRegistry()
+            registry.add_incident({
+                **event_data,
+                "decision_proposal": decision_proposal,
+                "authorized": False,
+                "status": "AWAITING_AUTHORITY"
+            })
+
             st.rerun()
 
     # --- Отображение результатов обработки ---
@@ -538,3 +564,83 @@ with tab4:
         )
     else:
         st.info("Complete the decision cycle to generate AVCS Record")
+
+
+# --- TAB 5: INCIDENT REGISTRY ---
+with tab5:
+    st.header("📋 Incident Registry")
+    st.caption("История всех обработанных инцидентов. Автоочистка >30 дней.")
+    
+    registry = IncidentRegistry()
+    incidents = registry.get_all_incidents()
+    stats = registry.get_statistics()
+    
+    # --- Статистика ---
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        st.metric("Total Incidents", stats["total"])
+    with col2:
+        st.metric("Event Types", len(stats["by_type"]))
+    with col3:
+        st.metric("Critical", stats["by_severity"].get("CRITICAL", 0))
+    with col4:
+        st.metric("Authorized", stats["by_status"].get("AUTHORIZED", 0))
+    
+    st.divider()
+    
+    # --- Фильтры ---
+    col1, col2 = st.columns(2)
+    with col1:
+        filter_type = st.selectbox("Filter by Event Type", ["All"] + list(stats["by_type"].keys()))
+    with col2:
+        filter_status = st.selectbox("Filter by Status", ["All"] + list(stats["by_status"].keys()))
+    
+    # --- Список событий ---
+    filtered_incidents = incidents
+    if filter_type != "All":
+        filtered_incidents = [i for i in filtered_incidents if i.get("event_type") == filter_type]
+    if filter_status != "All":
+        filtered_incidents = [i for i in filtered_incidents if i.get("status") == filter_status]
+    
+    if not filtered_incidents:
+        st.info("No incidents found.")
+    else:
+        st.write(f"Showing {len(filtered_incidents)} of {len(incidents)} incidents")
+        
+        for incident in reversed(filtered_incidents[-50:]):  # Последние 50
+            with st.expander(f"{incident['event_id']} — {incident['event_type']} ({incident['status']})"):
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.write(f"**Description:** {incident.get('description', 'N/A')}")
+                    st.write(f"**Severity:** {incident.get('severity', 'UNKNOWN')}")
+                    st.write(f"**Authorized:** {incident.get('authorized', False)}")
+                with col2:
+                    st.write(f"**Timestamp:** {incident.get('timestamp', 'N/A')}")
+                    if incident.get("critical_conditions"):
+                        st.write("**Critical Conditions:**")
+                        for cond in incident.get("critical_conditions", []):
+                            st.write(f"- {cond.get('condition')} ({cond.get('severity')})")
+                
+                if st.button(f"View Record", key=f"view_{incident['event_id']}"):
+                    st.json(incident.get("record", {}))
+    
+    st.divider()
+    
+    # --- Очистка ---
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("🗑️ Clear Old Records (>30 days)"):
+            removed = registry.clear_old_records(30)
+            if removed > 0:
+                st.success(f"Removed {removed} old records.")
+            else:
+                st.info("No records older than 30 days.")
+            st.rerun()
+    with col2:
+        if st.button("🗑️ Clear All Records (Danger)"):
+            # Простой подтверждение через чекбокс
+            confirm = st.checkbox("I understand this will delete ALL records")
+            if confirm:
+                count = registry.clear_all()
+                st.warning(f"Deleted {count} records.")
+                st.rerun()
