@@ -14,6 +14,7 @@ import json
 import os
 from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional
+from dateutil import parser
 
 
 class IncidentRegistry:
@@ -26,10 +27,6 @@ class IncidentRegistry:
         self.retention_days = retention_days
         self.incidents = []
         self._counter = 1
-        
-        print(f"[INCIDENT_REGISTRY] Initializing with storage_path: {self.storage_path}")
-        print(f"[INCIDENT_REGISTRY] Full path: {os.path.abspath(self.storage_path)}")
-        
         self._load()
         self._clean_old_records()
 
@@ -53,15 +50,12 @@ class IncidentRegistry:
     def _save(self):
         """Сохранить инциденты в файл."""
         try:
-            # Создаем папку если её нет
             os.makedirs(os.path.dirname(self.storage_path), exist_ok=True)
-            
             with open(self.storage_path, "w", encoding="utf-8") as f:
                 json.dump({
                     "incidents": self.incidents,
                     "counter": self._counter
                 }, f, indent=2, ensure_ascii=False)
-            
             print(f"[INCIDENT_REGISTRY] Saved {len(self.incidents)} incidents to {self.storage_path}")
         except Exception as e:
             print(f"[INCIDENT_REGISTRY] ERROR saving: {e}")
@@ -78,13 +72,14 @@ class IncidentRegistry:
         cleaned_incidents = []
         for incident in self.incidents:
             try:
-                timestamp_str = incident.get("timestamp", "").replace("Z", "+00:00")
+                timestamp_str = incident.get("timestamp", "")
                 if not timestamp_str:
                     continue
-                incident_time = datetime.fromisoformat(timestamp_str)
+                incident_time = parser.isoparse(timestamp_str)
                 if incident_time > cutoff:
                     cleaned_incidents.append(incident)
-            except (ValueError, TypeError):
+            except Exception as e:
+                print(f"[INCIDENT_REGISTRY] Error parsing timestamp: {e}")
                 continue
         
         self.incidents = cleaned_incidents
@@ -107,7 +102,6 @@ class IncidentRegistry:
         event_id = incident_data.get("event_id") or self.generate_event_id()
         print(f"[INCIDENT_REGISTRY] ========================================")
         print(f"[INCIDENT_REGISTRY] Adding incident: {event_id}")
-        print(f"[INCIDENT_REGISTRY] Incident data: {incident_data}")
         print(f"[INCIDENT_REGISTRY] Current incidents before add: {len(self.incidents)}")
         
         incident = {
@@ -133,7 +127,6 @@ class IncidentRegistry:
 
     def get_all_incidents(self) -> List[Dict[str, Any]]:
         """Получить все инциденты."""
-        print(f"[INCIDENT_REGISTRY] Returning {len(self.incidents)} incidents")
         return self.incidents
 
     def get_incident(self, event_id: str) -> Optional[Dict[str, Any]]:
@@ -182,13 +175,13 @@ class IncidentRegistry:
         cleaned_incidents = []
         for incident in self.incidents:
             try:
-                timestamp_str = incident.get("timestamp", "").replace("Z", "+00:00")
+                timestamp_str = incident.get("timestamp", "")
                 if not timestamp_str:
                     continue
-                incident_time = datetime.fromisoformat(timestamp_str)
+                incident_time = parser.isoparse(timestamp_str)
                 if incident_time > cutoff:
                     cleaned_incidents.append(incident)
-            except (ValueError, TypeError):
+            except Exception:
                 continue
         
         self.incidents = cleaned_incidents
@@ -202,5 +195,4 @@ class IncidentRegistry:
         count = len(self.incidents)
         self.incidents = []
         self._save()
-        print(f"[INCIDENT_REGISTRY] Cleared all {count} records")
         return count
