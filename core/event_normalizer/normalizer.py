@@ -5,20 +5,19 @@ Event Normalizer
 EXTRACT critical conditions from raw incident description
 PRESERVE all critical information
 PASS structured conditions to Dispatcher
+
+Version: v0.3.3 — Built-in Semantic Detection
 """
 
 from typing import Dict, Any, List
 from datetime import datetime
 import re
 
-# --- НОВЫЙ ИМПОРТ ДЛЯ v0.3 ---
-from core.semantic_analyzer import SemanticAnalyzer
-
 
 class EventNormalizer:
     """
     Event Normalizer extracts critical conditions from incident descriptions.
-    Now with Semantic Integrity (v0.3).
+    Now with built-in semantic detection (negation, uncertainty, context).
     """
 
     CRITICAL_KEYWORDS = {
@@ -38,8 +37,6 @@ class EventNormalizer:
     def __init__(self, config: Dict[str, Any] = None):
         self.config = config or {}
         self.critical_conditions = []
-        # --- НОВЫЙ КОМПОНЕНТ v0.3 ---
-        self.semantic_analyzer = SemanticAnalyzer()
 
     def normalize(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -55,7 +52,7 @@ class EventNormalizer:
         object_type = input_data.get("object", "Unknown")
         position = input_data.get("position", "Unknown")
 
-        # --- ОБНОВЛЁННОЕ ИЗВЛЕЧЕНИЕ С СЕМАНТИКОЙ ---
+        # Извлечение critical conditions с семантикой
         critical_conditions = self._extract_critical_conditions(description)
 
         # Определяем event type и severity
@@ -79,7 +76,6 @@ class EventNormalizer:
             "critical_conditions_count": len(critical_conditions),
             "has_critical": any(c.get("severity") == "CRITICAL" for c in critical_conditions),
             "has_high": any(c.get("severity") == "HIGH" for c in critical_conditions),
-            # --- НОВЫЕ ПОЛЯ ДЛЯ СЕМАНТИКИ ---
             "semantic_summary": semantic_summary,
             "status": "NORMALIZED"
         }
@@ -87,64 +83,120 @@ class EventNormalizer:
         self.critical_conditions = critical_conditions
         return {**input_data, **normalized_data}
 
-    # --- ОБНОВЛЁННЫЙ МЕТОД С СЕМАНТИЧЕСКИМ АНАЛИЗОМ ---
     def _extract_critical_conditions(self, text: str) -> List[Dict[str, Any]]:
         """
-        Extract critical conditions with semantic analysis.
+        Extract critical conditions with built-in semantic detection.
         
         Handles:
         - Polarity (positive, negative, neutral)
-        - Negation (no, not, without, never)
-        - Uncertainty (possible, suspected, maybe)
+        - Negation (no, not, without, never, ruled out)
+        - Uncertainty (suspected, possible, probable, appears, seems)
         - Context (previous, historical, reported)
         """
         conditions = []
         text_lower = text.lower()
 
+        # Паттерны для семантического анализа
+        negation_patterns = [
+            r"\bno\s+", r"\bnot\s+", r"\bwithout\s+",
+            r"\bnever\s+", r"\bruled\s+out\s*", r"\bexcluded\s*",
+            r"\babsent\s*", r"\bnot\s+detected\s*", r"\bno\s+evidence\s*"
+        ]
+
+        uncertainty_patterns = [
+            r"\bsuspected\s+", r"\bpossible\s+", r"\bprobable\s+",
+            r"\bprobably\s+", r"\bmaybe\s+", r"\bpotential\s+",
+            r"\bappears?\s*", r"\bseems?\s*", r"\bindicates?\s*",
+            r"\bsuggests?\s*"
+        ]
+
+        context_patterns = {
+            "previous": [r"\bprevious\s+", r"\bprior\s+", r"\bhistorical\s+", r"\bearlier\s+"],
+            "reported": [r"\breported\s+", r"\bstated\s+", r"\baccording to\s+"],
+            "confirmed": [r"\bconfirmed\s+", r"\bverified\s+", r"\bvalidated\s+"],
+        }
+
         for condition_type, config in self.CRITICAL_KEYWORDS.items():
             for keyword in config["keywords"]:
-                if keyword in text_lower:
-                    # --- СЕМАНТИЧЕСКИЙ АНАЛИЗ ---
-                    analysis = self.semantic_analyzer.analyze(text, keyword)
+                if keyword not in text_lower:
+                    continue
 
-                    # Если ключевое слово найдено, но отрицается — пропускаем
-                    if analysis["detected"] and analysis["polarity"] == "NEGATIVE":
-                        continue
+                position = text_lower.find(keyword)
 
-                    # Определяем severity на основе семантики
-                    severity = config["severity"]
-                    if analysis["uncertainty"] == "HIGH":
-                        if severity == "CRITICAL":
-                            severity = "HIGH"
-                        elif severity == "HIGH":
-                            severity = "MEDIUM"
+                # --- СЕМАНТИЧЕСКОЕ ОКНО ---
+                window_start = max(0, position - 50)
+                window_end = min(len(text), position + len(keyword) + 50)
+                window_text = text[window_start:window_end].lower()
 
-                    # Пропускаем исторический контекст
-                    if analysis["context"] == "PREVIOUS":
-                        continue
+                # --- ПРОВЕРКА ОТРИЦАНИЯ ---
+                negation_found = False
+                for pattern in negation_patterns:
+                    if re.search(pattern, window_text):
+                        negation_found = True
+                        break
 
-                    # Находим контекстное окружение
-                    position = text_lower.find(keyword)
-                    start = max(0, position - 30)
-                    end = min(len(text), position + 50)
-                    context = text[start:end].strip()
+                if negation_found:
+                    continue  # Пропускаем это условие
 
-                    conditions.append({
-                        "condition": condition_type.upper(),
-                        "severity": severity,
-                        "keyword": keyword,
-                        "context": context,
-                        # --- СЕМАНТИЧЕСКИЕ МЕТАДАННЫЕ ---
-                        "polarity": analysis["polarity"],
-                        "confidence": analysis["confidence"],
-                        "uncertainty": analysis["uncertainty"],
-                        "negation_found": analysis["negation_found"],
-                        "uncertainty_found": analysis["uncertainty_found"],
-                        "timestamp": datetime.utcnow().isoformat() + "Z",
-                        "source": "INCIDENT_INPUT",
-                        "status": "ACTIVE"
-                    })
-                    break
+                # --- ПРОВЕРКА НЕОПРЕДЕЛЁННОСТИ ---
+                uncertainty_found = False
+                for pattern in uncertainty_patterns:
+                    if re.search(pattern, window_text):
+                        uncertainty_found = True
+                        break
+
+                # --- ПРОВЕРКА КОНТЕКСТА ---
+                context_type = None
+                for ctx_type, patterns in context_patterns.items():
+                    for pattern in patterns:
+                        if re.search(pattern, window_text):
+                            context_type = ctx_type.upper()
+                            break
+                    if context_type:
+                        break
+
+                # Пропускаем исторический контекст
+                if context_type == "PREVIOUS":
+                    continue
+
+                # --- ОПРЕДЕЛЯЕМ ПОЛЯРНОСТЬ И УВЕРЕННОСТЬ ---
+                if uncertainty_found:
+                    polarity = "NEUTRAL"
+                    uncertainty = "HIGH"
+                    confidence = 0.6
+                else:
+                    polarity = "POSITIVE"
+                    uncertainty = None
+                    confidence = 0.8
+
+                # Корректировка severity при неопределённости
+                severity = config["severity"]
+                if uncertainty_found:
+                    if severity == "CRITICAL":
+                        severity = "HIGH"
+                    elif severity == "HIGH":
+                        severity = "MEDIUM"
+
+                # Контекст
+                start = max(0, position - 30)
+                end = min(len(text), position + 50)
+                context = text[start:end].strip()
+
+                conditions.append({
+                    "condition": condition_type.upper(),
+                    "severity": severity,
+                    "keyword": keyword,
+                    "context": context,
+                    "polarity": polarity,
+                    "confidence": confidence,
+                    "uncertainty": uncertainty,
+                    "negation_found": False,
+                    "uncertainty_found": uncertainty_found,
+                    "timestamp": datetime.utcnow().isoformat() + "Z",
+                    "source": "INCIDENT_INPUT",
+                    "status": "ACTIVE"
+                })
+                break  # Только одно условие на тип
 
         return conditions
 
@@ -187,7 +239,6 @@ class EventNormalizer:
         if not conditions:
             return "GENERAL"
 
-        # Приоритет по severity
         for condition in conditions:
             if condition.get("severity") == "CRITICAL":
                 return condition["condition"]
