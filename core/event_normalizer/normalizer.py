@@ -6,7 +6,7 @@ EXTRACT critical conditions from raw incident description
 PRESERVE all critical information
 PASS structured conditions to Dispatcher
 
-Version: v0.3.4 — Fixed confirmation detection
+Version: v0.3.5 — Fixed confirmation detection with debug
 """
 
 from typing import Dict, Any, List
@@ -41,26 +41,17 @@ class EventNormalizer:
     def normalize(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
         """
         Normalize raw incident data with semantic analysis.
-        
-        Args:
-            input_data: Raw incident data with description
-            
-        Returns:
-            Normalized data with critical conditions and semantic metadata
         """
         description = input_data.get("description", "")
         object_type = input_data.get("object", "Unknown")
         position = input_data.get("position", "Unknown")
 
-        # Извлечение critical conditions с семантикой
         critical_conditions = self._extract_critical_conditions(description)
 
-        # Определяем event type и severity
         event_type = self._determine_event_type(critical_conditions)
         severity = self._determine_overall_severity(critical_conditions)
         is_emergency = severity in ["CRITICAL", "HIGH"]
 
-        # Собираем семантическую информацию
         semantic_summary = self._build_semantic_summary(critical_conditions)
 
         normalized_data = {
@@ -86,17 +77,10 @@ class EventNormalizer:
     def _extract_critical_conditions(self, text: str) -> List[Dict[str, Any]]:
         """
         Extract critical conditions with built-in semantic detection.
-        
-        Handles:
-        - Confirmation (detected, confirmed, verified)
-        - Negation (no, not, without, never, ruled out)
-        - Uncertainty (suspected, possible, probable, appears, seems)
-        - Context (previous, historical, reported)
         """
         conditions = []
         text_lower = text.lower()
 
-        # Паттерны для семантического анализа
         negation_patterns = [
             r"\bno\s+", r"\bnot\s+", r"\bwithout\s+",
             r"\bnever\s+", r"\bruled\s+out\s*", r"\bexcluded\s*",
@@ -104,7 +88,7 @@ class EventNormalizer:
         ]
 
         confirmation_patterns = [
-            r"\bdetected\s+", r"\bconfirmed\s+", r"\bverified\s+", r"\bvalidated\s+"
+            r"\bdetected\b", r"\bconfirmed\b", r"\bverified\b", r"\bvalidated\b"
         ]
 
         uncertainty_patterns = [
@@ -127,12 +111,14 @@ class EventNormalizer:
 
                 position = text_lower.find(keyword)
 
-                # --- СЕМАНТИЧЕСКОЕ ОКНО ---
                 window_start = max(0, position - 50)
                 window_end = min(len(text), position + len(keyword) + 50)
                 window_text = text[window_start:window_end].lower()
 
-                # --- ПРОВЕРКА ОТРИЦАНИЯ ---
+                # --- DEBUG ---
+                print(f"[DEBUG] keyword={keyword}, window_text={window_text[:100]}")
+
+                # --- NEGATION ---
                 negation_found = False
                 for pattern in negation_patterns:
                     if re.search(pattern, window_text):
@@ -140,9 +126,10 @@ class EventNormalizer:
                         break
 
                 if negation_found:
-                    continue  # Пропускаем это условие
+                    print(f"[DEBUG] negation_found=True, skipping {keyword}")
+                    continue
 
-                # --- ПРОВЕРКА КОНТЕКСТА ---
+                # --- CONTEXT ---
                 context_type = None
                 for ctx_type, patterns in context_patterns.items():
                     for pattern in patterns:
@@ -152,25 +139,26 @@ class EventNormalizer:
                     if context_type:
                         break
 
-                # Пропускаем исторический контекст
                 if context_type == "PREVIOUS":
+                    print(f"[DEBUG] context_type=PREVIOUS, skipping {keyword}")
                     continue
 
-                # --- ПРОВЕРКА ПОДТВЕРЖДЕНИЯ ---
+                # --- CONFIRMATION ---
                 confirmation_found = False
                 for pattern in confirmation_patterns:
                     if re.search(pattern, window_text):
                         confirmation_found = True
                         break
 
+                print(f"[DEBUG] confirmation_found={confirmation_found}")
+
                 if confirmation_found:
-                    # Подтверждённое условие — добавляем
                     polarity = "POSITIVE"
                     uncertainty = None
                     confidence = 0.8
                     severity = config["severity"]
                 else:
-                    # --- ПРОВЕРКА НЕОПРЕДЕЛЁННОСТИ ---
+                    # --- UNCERTAINTY ---
                     uncertainty_found = False
                     for pattern in uncertainty_patterns:
                         if re.search(pattern, window_text):
@@ -178,16 +166,14 @@ class EventNormalizer:
                             break
 
                     if uncertainty_found:
-                        # Неопределённость — пропускаем
+                        print(f"[DEBUG] uncertainty_found=True, skipping {keyword}")
                         continue
                     else:
-                        # Обычное упоминание — добавляем
                         polarity = "POSITIVE"
                         uncertainty = None
                         confidence = 0.8
                         severity = config["severity"]
 
-                # Контекст
                 start = max(0, position - 30)
                 end = min(len(text), position + 50)
                 context = text[start:end].strip()
@@ -206,7 +192,7 @@ class EventNormalizer:
                     "source": "INCIDENT_INPUT",
                     "status": "ACTIVE"
                 })
-                break  # Только одно условие на тип
+                break
 
         return conditions
 
