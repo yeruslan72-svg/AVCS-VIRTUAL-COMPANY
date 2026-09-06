@@ -43,6 +43,7 @@ class SemanticAnalyzer:
     UNCERTAINTY_PATTERNS = [
         r"\bpossible\s+",
         r"\bsuspected\s+",
+        r"\bprobable\s+",
         r"\bprobably\s+",
         r"\bmaybe\s+",
         r"\bpotential\s+",
@@ -54,7 +55,7 @@ class SemanticAnalyzer:
 
     # Context markers
     CONTEXT_PATTERNS = {
-        "previous": [r"\bprevious\s+", r"\bprior\s+", r"\bhistorical\s+", r"\bealier\s+"],
+        "previous": [r"\bprevious\s+", r"\bprior\s+", r"\bhistorical\s+", r"\bearlier\s+"],
         "reported": [r"\breported\s+", r"\bstated\s+", r"\baccording to\s+"],
         "current": [r"\bcurrent\s+", r"\bnow\s+", r"\bat this time\s+"],
         "confirmed": [r"\bconfirmed\s+", r"\bverified\s+", r"\bvalidated\s+"],
