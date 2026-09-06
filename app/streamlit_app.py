@@ -191,6 +191,7 @@ if "initialized" not in st.session_state:
     st.session_state.decision_proposal = None
     st.session_state.authority_state = None
     st.session_state.authorized = None
+    st.session_state.incident_text = ""
 
 # --- Sidebar ---
 with st.sidebar:
@@ -217,6 +218,9 @@ with st.sidebar:
     # --- Кнопка сброса события ---
     st.divider()
     if st.button("🔄 Reset Event", use_container_width=True):
+        # Очищаем поле ввода
+        st.session_state.incident_text = ""
+        # Удаляем все ключи события
         for key in ["event_id", "event_data", "dispatcher_results", "department_results", 
                     "aggregated_state", "conflict_result", "decision_proposal", 
                     "authority_state", "authorized", "current_step"]:
@@ -237,6 +241,7 @@ with tab1:
     # --- Свободное описание инцидента ---
     incident_description = st.text_area(
         "Incident Description",
+        value=st.session_state.incident_text,
         height=150,
         placeholder="Describe the incident in detail...\n\nExample: 'Hull breach in compartment 3, water ingress 50 tons/hour, vessel listing 12 degrees, position 35°N 45°W, weather storm force 5'"
     )
@@ -255,6 +260,9 @@ with tab1:
         if not incident_description.strip():
             st.error("Please describe the incident.")
         else:
+            # Сохраняем текст в session_state
+            st.session_state.incident_text = incident_description
+
             # --- Формируем данные для обработки ---
             event_data = {
                 "event_id": f"EVT-{datetime.utcnow().strftime('%Y%m%d')}-001",
