@@ -6,10 +6,10 @@ EXTRACT critical conditions from raw incident description
 PRESERVE all critical information
 PASS structured conditions to Dispatcher
 
-Version: v0.3.5 — Fixed confirmation detection with debug
+Version: v0.3.6 — With debug info in UI
 """
 
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Tuple
 from datetime import datetime
 import re
 
@@ -37,6 +37,7 @@ class EventNormalizer:
     def __init__(self, config: Dict[str, Any] = None):
         self.config = config or {}
         self.critical_conditions = []
+        self.last_debug = {}
 
     def normalize(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -46,7 +47,8 @@ class EventNormalizer:
         object_type = input_data.get("object", "Unknown")
         position = input_data.get("position", "Unknown")
 
-        critical_conditions = self._extract_critical_conditions(description)
+        critical_conditions, debug_info = self._extract_critical_conditions(description)
+        self.last_debug = debug_info
 
         event_type = self._determine_event_type(critical_conditions)
         severity = self._determine_overall_severity(critical_conditions)
@@ -68,17 +70,24 @@ class EventNormalizer:
             "has_critical": any(c.get("severity") == "CRITICAL" for c in critical_conditions),
             "has_high": any(c.get("severity") == "HIGH" for c in critical_conditions),
             "semantic_summary": semantic_summary,
+            "debug_info": debug_info,
             "status": "NORMALIZED"
         }
 
         self.critical_conditions = critical_conditions
         return {**input_data, **normalized_data}
 
-    def _extract_critical_conditions(self, text: str) -> List[Dict[str, Any]]:
+    def _extract_critical_conditions(self, text: str) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
         """
         Extract critical conditions with built-in semantic detection.
+        Returns: (conditions, debug_info)
         """
         conditions = []
+        debug_info = {
+            "checks": [],
+            "keyword_results": {}
+        }
+
         text_lower = text.lower()
 
         negation_patterns = [
@@ -115,8 +124,15 @@ class EventNormalizer:
                 window_end = min(len(text), position + len(keyword) + 50)
                 window_text = text[window_start:window_end].lower()
 
-                # --- DEBUG ---
-                print(f"[DEBUG] keyword={keyword}, window_text={window_text[:100]}")
+                check_result = {
+                    "keyword": keyword,
+                    "window_text": window_text[:100],
+                    "negation_found": False,
+                    "confirmation_found": False,
+                    "uncertainty_found": False,
+                    "context_type": None,
+                    "action": "unknown"
+                }
 
                 # --- NEGATION ---
                 negation_found = False
@@ -126,7 +142,9 @@ class EventNormalizer:
                         break
 
                 if negation_found:
-                    print(f"[DEBUG] negation_found=True, skipping {keyword}")
+                    check_result["negation_found"] = True
+                    check_result["action"] = "skipped_negation"
+                    debug_info["checks"].append(check_result)
                     continue
 
                 # --- CONTEXT ---
@@ -139,8 +157,11 @@ class EventNormalizer:
                     if context_type:
                         break
 
+                check_result["context_type"] = context_type
+
                 if context_type == "PREVIOUS":
-                    print(f"[DEBUG] context_type=PREVIOUS, skipping {keyword}")
+                    check_result["action"] = "skipped_previous"
+                    debug_info["checks"].append(check_result)
                     continue
 
                 # --- CONFIRMATION ---
@@ -150,13 +171,14 @@ class EventNormalizer:
                         confirmation_found = True
                         break
 
-                print(f"[DEBUG] confirmation_found={confirmation_found}")
+                check_result["confirmation_found"] = confirmation_found
 
                 if confirmation_found:
+                    check_result["action"] = "added_confirmed"
+                    severity = config["severity"]
                     polarity = "POSITIVE"
                     uncertainty = None
                     confidence = 0.8
-                    severity = config["severity"]
                 else:
                     # --- UNCERTAINTY ---
                     uncertainty_found = False
@@ -165,14 +187,18 @@ class EventNormalizer:
                             uncertainty_found = True
                             break
 
+                    check_result["uncertainty_found"] = uncertainty_found
+
                     if uncertainty_found:
-                        print(f"[DEBUG] uncertainty_found=True, skipping {keyword}")
+                        check_result["action"] = "skipped_uncertainty"
+                        debug_info["checks"].append(check_result)
                         continue
                     else:
+                        check_result["action"] = "added_default"
+                        severity = config["severity"]
                         polarity = "POSITIVE"
                         uncertainty = None
                         confidence = 0.8
-                        severity = config["severity"]
 
                 start = max(0, position - 30)
                 end = min(len(text), position + 50)
@@ -192,9 +218,11 @@ class EventNormalizer:
                     "source": "INCIDENT_INPUT",
                     "status": "ACTIVE"
                 })
+
+                debug_info["checks"].append(check_result)
                 break
 
-        return conditions
+        return conditions, debug_info
 
     def _build_semantic_summary(self, conditions: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Build a summary of semantic information from all conditions."""
@@ -256,3 +284,7 @@ class EventNormalizer:
     def get_critical_conditions(self) -> List[Dict[str, Any]]:
         """Return critical conditions."""
         return self.critical_conditions
+
+    def get_last_debug(self) -> Dict[str, Any]:
+        """Return last debug info."""
+        return self.last_debug
