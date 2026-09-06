@@ -37,20 +37,27 @@ class IncidentRegistry:
                     data = json.load(f)
                     self.incidents = data.get("incidents", [])
                     self._counter = data.get("counter", len(self.incidents) + 1)
-            except:
+                print(f"[INCIDENT_REGISTRY] Loaded {len(self.incidents)} incidents, counter: {self._counter}")
+            except Exception as e:
+                print(f"[INCIDENT_REGISTRY] Error loading: {e}")
                 self.incidents = []
                 self._counter = 1
         else:
+            print(f"[INCIDENT_REGISTRY] No existing file, starting fresh")
             self._counter = 1
 
     def _save(self):
         """Сохранить инциденты в файл."""
-        os.makedirs(os.path.dirname(self.storage_path), exist_ok=True)
-        with open(self.storage_path, "w", encoding="utf-8") as f:
-            json.dump({
-                "incidents": self.incidents,
-                "counter": self._counter
-            }, f, indent=2, ensure_ascii=False)
+        try:
+            os.makedirs(os.path.dirname(self.storage_path), exist_ok=True)
+            with open(self.storage_path, "w", encoding="utf-8") as f:
+                json.dump({
+                    "incidents": self.incidents,
+                    "counter": self._counter
+                }, f, indent=2, ensure_ascii=False)
+            print(f"[INCIDENT_REGISTRY] Saved {len(self.incidents)} incidents to {self.storage_path}")
+        except Exception as e:
+            print(f"[INCIDENT_REGISTRY] ERROR saving: {e}")
 
     def _clean_old_records(self):
         """Удалить записи старше retention_days."""
@@ -71,7 +78,6 @@ class IncidentRegistry:
                 if incident_time > cutoff:
                     cleaned_incidents.append(incident)
             except (ValueError, TypeError):
-                # Если timestamp некорректный — пропускаем запись
                 continue
         
         self.incidents = cleaned_incidents
@@ -86,11 +92,13 @@ class IncidentRegistry:
         event_id = f"EVT-{datetime.utcnow().strftime('%Y%m%d')}-{self._counter:03d}"
         self._counter += 1
         self._save()
+        print(f"[INCIDENT_REGISTRY] Generated event ID: {event_id}")
         return event_id
 
     def add_incident(self, incident_data: Dict[str, Any]) -> str:
         """Добавить новый инцидент в реестр."""
         event_id = incident_data.get("event_id") or self.generate_event_id()
+        print(f"[INCIDENT_REGISTRY] Adding incident: {event_id}")
         
         incident = {
             "event_id": event_id,
@@ -108,10 +116,12 @@ class IncidentRegistry:
         
         self.incidents.append(incident)
         self._save()
+        print(f"[INCIDENT_REGISTRY] Total incidents: {len(self.incidents)}")
         return event_id
 
     def get_all_incidents(self) -> List[Dict[str, Any]]:
         """Получить все инциденты."""
+        print(f"[INCIDENT_REGISTRY] Returning {len(self.incidents)} incidents")
         return self.incidents
 
     def get_incident(self, event_id: str) -> Optional[Dict[str, Any]]:
@@ -180,4 +190,5 @@ class IncidentRegistry:
         count = len(self.incidents)
         self.incidents = []
         self._save()
+        print(f"[INCIDENT_REGISTRY] Cleared all {count} records")
         return count
