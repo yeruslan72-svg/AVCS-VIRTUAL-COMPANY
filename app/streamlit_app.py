@@ -236,7 +236,7 @@ with st.sidebar:
         st.session_state.speed = 0
         
         # Удаляем только текущую сессию, НЕ реестр
-        for key in ["event_data", "dispatcher_results", "department_results", 
+        for key in ["event_id", "event_data", "dispatcher_results", "department_results", 
                     "aggregated_state", "conflict_result", "decision_proposal", 
                     "authority_state", "authorized", "current_step"]:
             if key in st.session_state:
@@ -337,7 +337,7 @@ with tab1:
 
     if st.session_state.get("event_id"):
         st.success(f"Event created: {st.session_state.event_id}")
-        if st.session_state.event_data and "critical_conditions" in st.session_state.event_data:
+        if st.session_state.get("event_data") and "critical_conditions" in st.session_state.get("event_data", {}):
             with st.expander("📋 Critical Conditions Extracted"):
                 st.json(st.session_state.event_data["critical_conditions"])
 
