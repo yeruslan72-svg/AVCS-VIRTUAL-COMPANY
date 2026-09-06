@@ -5,9 +5,8 @@ Incident Registry — Хранилище всех инцидентов
 
 import json
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, List, Optional
-from dateutil import parser
 
 
 class IncidentRegistry:
@@ -48,32 +47,54 @@ class IncidentRegistry:
             print(f"[INCIDENT_REGISTRY] ERROR saving: {e}")
 
     def _clean_old_records(self):
+        """Удалить записи старше retention_days."""
         if not self.incidents:
             return
         
-        now = datetime.utcnow()
-        cutoff = now - timedelta(days=self.retention_days)
+        cutoff = datetime.now(timezone.utc) - timedelta(days=self.retention_days)
         original_count = len(self.incidents)
-        
-        cleaned_incidents = []
-        for incident in self.incidents:
-            try:
-                timestamp_str = incident.get("timestamp", "")
-                if not timestamp_str:
-                    continue
-                incident_time = parser.isoparse(timestamp_str)
-                if incident_time > cutoff:
-                    cleaned_incidents.append(incident)
-            except Exception as e:
-                print(f"[INCIDENT_REGISTRY] Error parsing timestamp: {e}")
+        fresh_records = []
+
+        for record in self.incidents:
+            timestamp = record.get("timestamp")
+            event_id = record.get("event_id", "UNKNOWN")
+
+            if not timestamp:
+                # Не удаляем записи без timestamp
+                print(f"[INCIDENT_REGISTRY] Record {event_id} has no timestamp — preserving")
+                fresh_records.append(record)
                 continue
-        
-        self.incidents = cleaned_incidents
+
+            try:
+                # Парсим ISO-формат с Z
+                record_time = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
+
+                # Нормализуем к UTC
+                if record_time.tzinfo is None:
+                    record_time = record_time.replace(tzinfo=timezone.utc)
+                else:
+                    record_time = record_time.astimezone(timezone.utc)
+
+                # Логируем возраст записи
+                age_days = (datetime.now(timezone.utc) - record_time).total_seconds() / 86400
+                print(f"[INCIDENT_REGISTRY] Record {event_id} age={age_days:.2f} days")
+
+                if record_time >= cutoff:
+                    fresh_records.append(record)
+
+            except (ValueError, TypeError) as e:
+                # Сохраняем проблемные записи для анализа
+                print(f"[INCIDENT_REGISTRY] Record {event_id} has invalid timestamp — preserving: {e}")
+                fresh_records.append(record)
+
+        self.incidents = fresh_records
         
         removed = original_count - len(self.incidents)
         if removed > 0:
             print(f"[INCIDENT_REGISTRY] Removed {removed} old records (>{self.retention_days} days)")
             self._save()
+        else:
+            print(f"[INCIDENT_REGISTRY] No records removed, {len(self.incidents)} kept")
 
     def generate_event_id(self) -> str:
         event_id = f"EVT-{datetime.utcnow().strftime('%Y%m%d')}-{self._counter:03d}"
@@ -88,7 +109,7 @@ class IncidentRegistry:
         
         incident = {
             "event_id": event_id,
-            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
             "description": incident_data.get("description", ""),
             "event_type": incident_data.get("event_type", "UNKNOWN"),
             "severity": incident_data.get("severity", "UNKNOWN"),
@@ -102,9 +123,11 @@ class IncidentRegistry:
         
         self.incidents.append(incident)
         self._save()
+        print(f"[INCIDENT_REGISTRY] Total incidents: {len(self.incidents)}")
         return event_id
 
     def get_all_incidents(self) -> List[Dict[str, Any]]:
+        print(f"[INCIDENT_REGISTRY] Returning {len(self.incidents)} incidents")
         return self.incidents
 
     def get_incident(self, event_id: str) -> Optional[Dict[str, Any]]:
@@ -142,23 +165,29 @@ class IncidentRegistry:
         if days is None:
             days = self.retention_days
         
-        now = datetime.utcnow()
-        cutoff = now - timedelta(days=days)
+        cutoff = datetime.now(timezone.utc) - timedelta(days=days)
         original_count = len(self.incidents)
-        
-        cleaned_incidents = []
-        for incident in self.incidents:
-            try:
-                timestamp_str = incident.get("timestamp", "")
-                if not timestamp_str:
-                    continue
-                incident_time = parser.isoparse(timestamp_str)
-                if incident_time > cutoff:
-                    cleaned_incidents.append(incident)
-            except Exception:
+        fresh_records = []
+
+        for record in self.incidents:
+            timestamp = record.get("timestamp")
+            if not timestamp:
+                fresh_records.append(record)
                 continue
-        
-        self.incidents = cleaned_incidents
+
+            try:
+                record_time = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
+                if record_time.tzinfo is None:
+                    record_time = record_time.replace(tzinfo=timezone.utc)
+                else:
+                    record_time = record_time.astimezone(timezone.utc)
+
+                if record_time >= cutoff:
+                    fresh_records.append(record)
+            except (ValueError, TypeError):
+                fresh_records.append(record)
+
+        self.incidents = fresh_records
         
         removed = original_count - len(self.incidents)
         self._save()
