@@ -6,7 +6,7 @@ EXTRACT critical conditions from raw incident description
 PRESERVE all critical information
 PASS structured conditions to Dispatcher
 
-Version: v0.3.3 — Built-in Semantic Detection
+Version: v0.3.4 — Fixed confirmation detection
 """
 
 from typing import Dict, Any, List
@@ -17,7 +17,7 @@ import re
 class EventNormalizer:
     """
     Event Normalizer extracts critical conditions from incident descriptions.
-    Now with built-in semantic detection (negation, uncertainty, context).
+    Now with built-in semantic detection (negation, uncertainty, confirmation).
     """
 
     CRITICAL_KEYWORDS = {
@@ -88,7 +88,7 @@ class EventNormalizer:
         Extract critical conditions with built-in semantic detection.
         
         Handles:
-        - Polarity (positive, negative, neutral)
+        - Confirmation (detected, confirmed, verified)
         - Negation (no, not, without, never, ruled out)
         - Uncertainty (suspected, possible, probable, appears, seems)
         - Context (previous, historical, reported)
@@ -101,6 +101,10 @@ class EventNormalizer:
             r"\bno\s+", r"\bnot\s+", r"\bwithout\s+",
             r"\bnever\s+", r"\bruled\s+out\s*", r"\bexcluded\s*",
             r"\babsent\s*", r"\bnot\s+detected\s*", r"\bno\s+evidence\s*"
+        ]
+
+        confirmation_patterns = [
+            r"\bdetected\s+", r"\bconfirmed\s+", r"\bverified\s+", r"\bvalidated\s+"
         ]
 
         uncertainty_patterns = [
@@ -138,13 +142,6 @@ class EventNormalizer:
                 if negation_found:
                     continue  # Пропускаем это условие
 
-                # --- ПРОВЕРКА НЕОПРЕДЕЛЁННОСТИ ---
-                uncertainty_found = False
-                for pattern in uncertainty_patterns:
-                    if re.search(pattern, window_text):
-                        uncertainty_found = True
-                        break
-
                 # --- ПРОВЕРКА КОНТЕКСТА ---
                 context_type = None
                 for ctx_type, patterns in context_patterns.items():
@@ -159,23 +156,36 @@ class EventNormalizer:
                 if context_type == "PREVIOUS":
                     continue
 
-                # --- ОПРЕДЕЛЯЕМ ПОЛЯРНОСТЬ И УВЕРЕННОСТЬ ---
-                if uncertainty_found:
-                    polarity = "NEUTRAL"
-                    uncertainty = "HIGH"
-                    confidence = 0.6
-                else:
+                # --- ПРОВЕРКА ПОДТВЕРЖДЕНИЯ ---
+                confirmation_found = False
+                for pattern in confirmation_patterns:
+                    if re.search(pattern, window_text):
+                        confirmation_found = True
+                        break
+
+                if confirmation_found:
+                    # Подтверждённое условие — добавляем
                     polarity = "POSITIVE"
                     uncertainty = None
                     confidence = 0.8
+                    severity = config["severity"]
+                else:
+                    # --- ПРОВЕРКА НЕОПРЕДЕЛЁННОСТИ ---
+                    uncertainty_found = False
+                    for pattern in uncertainty_patterns:
+                        if re.search(pattern, window_text):
+                            uncertainty_found = True
+                            break
 
-                # Корректировка severity при неопределённости
-                severity = config["severity"]
-                if uncertainty_found:
-                    if severity == "CRITICAL":
-                        severity = "HIGH"
-                    elif severity == "HIGH":
-                        severity = "MEDIUM"
+                    if uncertainty_found:
+                        # Неопределённость — пропускаем
+                        continue
+                    else:
+                        # Обычное упоминание — добавляем
+                        polarity = "POSITIVE"
+                        uncertainty = None
+                        confidence = 0.8
+                        severity = config["severity"]
 
                 # Контекст
                 start = max(0, position - 30)
@@ -191,7 +201,7 @@ class EventNormalizer:
                     "confidence": confidence,
                     "uncertainty": uncertainty,
                     "negation_found": False,
-                    "uncertainty_found": uncertainty_found,
+                    "uncertainty_found": uncertainty_found if not confirmation_found else False,
                     "timestamp": datetime.utcnow().isoformat() + "Z",
                     "source": "INCIDENT_INPUT",
                     "status": "ACTIVE"
