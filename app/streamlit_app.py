@@ -397,7 +397,7 @@ with tab2:
             st.rerun()
 
     # --- Отображение результатов обработки ---
-    if st.session_state.department_results:
+    if st.session_state.get("department_results"):
         st.subheader("Department Assessments")
         for dept, result in st.session_state.department_results.items():
             with st.expander(f"📋 {dept}"):
@@ -406,7 +406,7 @@ with tab2:
                 else:
                     st.json(result)
 
-    if st.session_state.aggregated_state:
+    if st.session_state.get("aggregated_state"):
         st.subheader("📊 Aggregated State")
         st.json(st.session_state.aggregated_state)
 
@@ -422,7 +422,7 @@ with tab2:
                 st.success(f"✅ LOW RISK: {risk_data.get('risk_count', 0)} risks identified")
             st.json(risk_data)
 
-    if st.session_state.conflict_result:
+    if st.session_state.get("conflict_result"):
         st.subheader("⚠️ Conflict Detection")
         if st.session_state.conflict_result.get("has_conflicts"):
             st.warning("Conflicts detected!")
@@ -435,11 +435,11 @@ with tab2:
 with tab3:
     st.header("Decision Authority")
 
-    if st.session_state.decision_proposal:
+    if st.session_state.get("decision_proposal"):
         st.subheader("Decision Proposal")
         st.json(st.session_state.decision_proposal)
 
-    if st.session_state.authority_state:
+    if st.session_state.get("authority_state"):
         st.subheader("Authority Gate")
         st.json(st.session_state.authority_state)
 
@@ -459,10 +459,10 @@ with tab3:
                     st.session_state.current_step = "completed"
                     st.rerun()
 
-        if st.session_state.authorized is True:
+        if st.session_state.get("authorized") is True:
             st.success("✅ Decision Authorized")
             st.session_state.current_step = "completed"
-        elif st.session_state.authorized is False:
+        elif st.session_state.get("authorized") is False:
             st.error("❌ Decision Rejected")
 
 
@@ -471,7 +471,7 @@ with tab4:
     st.header("AVCS Decision Record")
 
     if st.session_state.current_step == "completed":
-        if st.session_state.authorized:
+        if st.session_state.get("authorized"):
             st.success("Decision Cycle Completed — Authorized")
         else:
             st.info("Decision Cycle Completed — Rejected")
