@@ -15,13 +15,6 @@ import re
 class EventNormalizer:
     """
     Event Normalizer extracts critical conditions from incident descriptions.
-    
-    Responsibilities:
-    - Parse raw incident text
-    - Extract critical conditions (fire, smoke, evacuation, etc.)
-    - Classify severity
-    - Preserve all critical information
-    - Pass structured data to Dispatcher
     """
 
     CRITICAL_KEYWORDS = {
@@ -29,6 +22,7 @@ class EventNormalizer:
         "smoke": {"severity": "HIGH", "keywords": ["smoke", "fume"]},
         "evacuation": {"severity": "CRITICAL", "keywords": ["evacuate", "evacuating", "abandon"]},
         "temperature": {"severity": "HIGH", "keywords": ["temperature", "heat", "overheat"]},
+        "oil_spill": {"severity": "CRITICAL", "keywords": ["oil", "spill", "leak", "pollution", "environmental"]},
         "hull_breach": {"severity": "CRITICAL", "keywords": ["breach", "hull", "flood", "water ingress"]},
         "man_overboard": {"severity": "CRITICAL", "keywords": ["overboard", "man overboard", "MOB"]},
         "gas_leak": {"severity": "CRITICAL", "keywords": ["gas leak", "methane", "toxic"]},
@@ -42,32 +36,16 @@ class EventNormalizer:
         self.critical_conditions = []
 
     def normalize(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Normalize raw incident data.
-        
-        Args:
-            input_data: Raw incident data with description
-            
-        Returns:
-            Normalized data with critical conditions
-        """
+        """Normalize raw incident data."""
         description = input_data.get("description", "")
         object_type = input_data.get("object", "Unknown")
         position = input_data.get("position", "Unknown")
 
-        # Extract critical conditions
         critical_conditions = self._extract_critical_conditions(description)
-
-        # Determine event type
         event_type = self._determine_event_type(critical_conditions)
-
-        # Determine severity
         severity = self._determine_overall_severity(critical_conditions)
-
-        # Check if emergency
         is_emergency = severity in ["CRITICAL", "HIGH"]
 
-        # Build normalized data
         normalized_data = {
             "event_id": input_data.get("event_id", f"EVT-{datetime.utcnow().strftime('%Y%m%d')}-001"),
             "raw_description": description,
@@ -85,11 +63,7 @@ class EventNormalizer:
         }
 
         self.critical_conditions = critical_conditions
-
-        # Merge with original input data
-        merged_data = {**input_data, **normalized_data}
-
-        return merged_data
+        return {**input_data, **normalized_data}
 
     def _extract_critical_conditions(self, text: str) -> List[Dict[str, Any]]:
         """Extract critical conditions from text."""
@@ -99,7 +73,6 @@ class EventNormalizer:
         for condition_type, config in self.CRITICAL_KEYWORDS.items():
             for keyword in config["keywords"]:
                 if keyword in text_lower:
-                    # Find the context around the keyword
                     position = text_lower.find(keyword)
                     start = max(0, position - 30)
                     end = min(len(text), position + 50)
@@ -114,7 +87,7 @@ class EventNormalizer:
                         "source": "INCIDENT_INPUT",
                         "status": "ACTIVE"
                     })
-                    break  # Only add once per condition type
+                    break
 
         return conditions
 
@@ -123,7 +96,6 @@ class EventNormalizer:
         if not conditions:
             return "GENERAL"
 
-        # Prioritize based on severity
         for condition in conditions:
             if condition["severity"] == "CRITICAL":
                 return condition["condition"]
