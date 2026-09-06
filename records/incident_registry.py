@@ -61,10 +61,20 @@ class IncidentRegistry:
         cutoff = now - timedelta(days=self.retention_days)
         original_count = len(self.incidents)
         
-        self.incidents = [
-            incident for incident in self.incidents
-            if datetime.fromisoformat(incident.get("timestamp", "").replace("Z", "+00:00")) > cutoff
-        ]
+        cleaned_incidents = []
+        for incident in self.incidents:
+            try:
+                timestamp_str = incident.get("timestamp", "").replace("Z", "+00:00")
+                if not timestamp_str:
+                    continue
+                incident_time = datetime.fromisoformat(timestamp_str)
+                if incident_time > cutoff:
+                    cleaned_incidents.append(incident)
+            except (ValueError, TypeError):
+                # Если timestamp некорректный — пропускаем запись
+                continue
+        
+        self.incidents = cleaned_incidents
         
         removed = original_count - len(self.incidents)
         if removed > 0:
@@ -147,10 +157,19 @@ class IncidentRegistry:
         cutoff = now - timedelta(days=days)
         original_count = len(self.incidents)
         
-        self.incidents = [
-            incident for incident in self.incidents
-            if datetime.fromisoformat(incident.get("timestamp", "").replace("Z", "+00:00")) > cutoff
-        ]
+        cleaned_incidents = []
+        for incident in self.incidents:
+            try:
+                timestamp_str = incident.get("timestamp", "").replace("Z", "+00:00")
+                if not timestamp_str:
+                    continue
+                incident_time = datetime.fromisoformat(timestamp_str)
+                if incident_time > cutoff:
+                    cleaned_incidents.append(incident)
+            except (ValueError, TypeError):
+                continue
+        
+        self.incidents = cleaned_incidents
         
         removed = original_count - len(self.incidents)
         self._save()
