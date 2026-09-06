@@ -164,7 +164,7 @@ if not st.session_state.welcome_shown:
     </div>
     """, unsafe_allow_html=True)
 
-    # --- КНОПКА ВХОДА (ИСПРАВЛЕННАЯ) ---
+    # --- КНОПКА ВХОДА ---
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         if st.button("▸ ENTER COMMAND CENTER", use_container_width=True, type="primary"):
@@ -198,19 +198,15 @@ with st.sidebar:
     try:
         st.image("app/logo.png", width=200)
     except:
-        st.markdown("""
-        <div style="text-align: center; padding: 10px 0;">
-            <span style="font-size: 28px; font-weight: bold; color: #c9a84c;">🧭 AVCS</span>
-            <br>
-            <span style="font-size: 12px; color: #666; letter-spacing: 2px;">STRUCTURAL INTEGRITY SYSTEM</span>
-        </div>
-        """, unsafe_allow_html=True)
+        st.markdown("### 🧭 AVCS")
     
     st.divider()
     
     st.header("System Status")
-    if st.session_state.event_id:
+    if st.session_state.get("event_id"):
         st.info(f"Event: {st.session_state.event_id}")
+    else:
+        st.info("No active event")
     st.write(f"Step: {st.session_state.current_step}")
     st.divider()
     st.header("Architecture")
@@ -281,7 +277,7 @@ with tab1:
             st.session_state.current_step = "processing"
             st.rerun()
 
-    if st.session_state.event_id:
+    if st.session_state.get("event_id"):
         st.success(f"Event created: {st.session_state.event_id}")
         if st.session_state.event_data and "critical_conditions" in st.session_state.event_data:
             with st.expander("📋 Critical Conditions Extracted"):
@@ -313,7 +309,7 @@ with tab2:
             dispatcher.register_department(helm)
             dispatcher.register_department(captain)
 
-            # --- Создаём остальные компоненты ---
+            # --- Создаем остальные компоненты ---
             aggregator = Aggregator()
             conflict_detector = ConflictDetector()
             decision_engine = DecisionEngine()
