@@ -157,7 +157,7 @@ class EventNormalizer:
                     uncertainty = None
                     confidence = 0.8
                     severity = config["severity"]
-                else:
+                 else:
                     # --- UNCERTAINTY ---
                     uncertainty_found = False
                     for pattern in uncertainty_patterns:
@@ -171,7 +171,7 @@ class EventNormalizer:
                         uncertainty = "HIGH"
                         confidence = 0.6
                         severity = config["severity"]
-                    else:
+                     else:
                         polarity = "POSITIVE"
                         uncertainty = None
                         confidence = 0.8
