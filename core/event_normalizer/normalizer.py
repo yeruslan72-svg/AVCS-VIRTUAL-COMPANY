@@ -165,14 +165,17 @@ class EventNormalizer:
                             uncertainty_found = True
                             break
 
-                    if uncertainty_found:
-                        print(f"[DEBUG] uncertainty_found=True, skipping {keyword}")
-                        continue
-                    else:
-                        polarity = "POSITIVE"
-                        uncertainty = None
-                        confidence = 0.8
-                        severity = config["severity"]
+                  if uncertainty_found:
+                   print(f"[DEBUG] uncertainty_found=True, setting NEUTRAL for {keyword}")
+                   polarity = "NEUTRAL"
+                   uncertainty = "HIGH"
+                   confidence = 0.6
+                   severity = config["severity"]
+                  else:
+                      polarity = "POSITIVE"
+                      uncertainty = None
+                      confidence = 0.8
+                      severity = config["severity"]
 
                 start = max(0, position - 30)
                 end = min(len(text), position + 50)
