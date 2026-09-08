@@ -1,10 +1,7 @@
 """
 AVCS VIRTUAL COMPANY
 Streamlit UI — Operational Decision Dashboard
-Version: v0.4.0 — Full Combat Machine
-
-Full cycle:
-INCIDENT → SEMANTIC STATE → DISPATCHER → 7 Dpts. → AGGREGATION → CONFLICT → DECISION → AUTHORITY → EXECUTION → RECORD
+Version: v0.4.1 — Full Combat Machine with Welcome Screen
 """
 
 import os
@@ -14,6 +11,7 @@ from datetime import datetime, timezone
 
 import streamlit as st
 import json
+from PIL import Image
 
 # ---------------------------------------------------------------------------
 # Project path
@@ -525,7 +523,7 @@ class SemanticEventNormalizer:
 
 
 # ===========================================================================
-# STREAMLIT UI — FULL COMBAT MACHINE v0.4.0
+# STREAMLIT UI — FULL COMBAT MACHINE v0.4.1
 # ===========================================================================
 
 st.set_page_config(
@@ -534,8 +532,56 @@ st.set_page_config(
     layout="wide",
 )
 
+# ---------------------------------------------------------------------------
+# WELCOME SCREEN
+# ---------------------------------------------------------------------------
+
+if "welcome_shown" not in st.session_state:
+    st.session_state.welcome_shown = False
+
+if not st.session_state.welcome_shown:
+    # Отображаем заставку на весь экран
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        try:
+            # Показываем картинку North
+            image_path = os.path.join(ROOT_PATH, "app", "north_is_not_negotiable.png")
+            if os.path.exists(image_path):
+                st.image(image_path, use_container_width=True)
+            else:
+                st.warning("North image not found. Please check the file path.")
+        except Exception as e:
+            st.error(f"Error loading image: {e}")
+
+        st.markdown("---")
+        st.markdown(
+            """
+            <div style="text-align: center; color: #8a8a8a; font-family: 'Courier New', monospace;">
+                <p style="font-size: 18px; letter-spacing: 2px;">
+                    STRUCTURAL INTEGRITY FOR DECISIONS UNDER PRESSURE
+                </p>
+                <p style="font-size: 14px; color: #555;">
+                    AVCS — Adaptive Vector Control System
+                </p>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+        # Кнопка входа
+        if st.button("▸ ENTER COMMAND CENTER", use_container_width=True, type="primary"):
+            st.session_state.welcome_shown = True
+            st.rerun()
+
+    st.stop()
+
+
+# ===========================================================================
+# MAIN APPLICATION
+# ===========================================================================
+
 st.title("🧭 AVCS VIRTUAL COMPANY")
-st.caption("AI-Driven Operational Decision Architecture — v0.4.0 Full Combat Machine")
+st.caption("AI-Driven Operational Decision Architecture — v0.4.1 Full Combat Machine")
 
 # Инициализация сессии
 if "initialized" not in st.session_state:
@@ -576,7 +622,7 @@ with st.sidebar:
     st.header("Architecture")
     st.caption("INCIDENT → SEMANTIC STATE → DISPATCHER → 7 Dpts. → AGGREGATION → CONFLICT → DECISION → AUTHORITY → EXECUTION → RECORD")
     st.divider()
-    st.caption("Version: 0.4.0")
+    st.caption("Version: 0.4.1")
 
     if st.button("🔄 Reset Event", use_container_width=True):
         for key in ["event_id", "event_data", "dispatcher_results", "department_results", 
@@ -631,7 +677,6 @@ with tab1:
             st.session_state.heading = heading
             st.session_state.speed = speed
 
-            # --- НОРМАЛИЗАЦИЯ ---
             normalized = normalizer.normalize(incident_description)
 
             registry = IncidentRegistry()
@@ -827,7 +872,6 @@ with tab3:
                 if st.button("✅ Approve", type="primary"):
                     st.session_state.authorized = True
                     st.session_state.current_step = "executing"
-                    # Обновляем реестр
                     registry = IncidentRegistry()
                     registry.update_incident(st.session_state.event_id, {
                         "authorized": True,
@@ -942,17 +986,4 @@ with tab5:
     
     col1, col2 = st.columns(2)
     with col1:
-        if st.button("🗑️ Clear Old Records (>30 days)"):
-            removed = registry.clear_old_records(30)
-            if removed > 0:
-                st.success(f"Removed {removed} old records.")
-            else:
-                st.info("No records older than 30 days.")
-            st.rerun()
-    with col2:
-        if st.button("🗑️ Clear All Records (Danger)"):
-            confirm = st.checkbox("I understand this will delete ALL records")
-            if confirm:
-                count = registry.clear_all()
-                st.warning(f"Deleted {count} records.")
-                st.rerun()
+        if
