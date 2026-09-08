@@ -11,7 +11,6 @@ from datetime import datetime, timezone
 
 import streamlit as st
 import json
-from PIL import Image
 
 # ---------------------------------------------------------------------------
 # Project path
@@ -540,11 +539,9 @@ if "welcome_shown" not in st.session_state:
     st.session_state.welcome_shown = False
 
 if not st.session_state.welcome_shown:
-    # Отображаем заставку на весь экран
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         try:
-            # Показываем картинку North
             image_path = os.path.join(ROOT_PATH, "app", "north_is_not_negotiable.png")
             if os.path.exists(image_path):
                 st.image(image_path, use_container_width=True)
@@ -568,13 +565,11 @@ if not st.session_state.welcome_shown:
             unsafe_allow_html=True
         )
 
-        # Кнопка входа
         if st.button("▸ ENTER COMMAND CENTER", use_container_width=True, type="primary"):
             st.session_state.welcome_shown = True
             st.rerun()
 
     st.stop()
-
 
 # ===========================================================================
 # MAIN APPLICATION
@@ -989,4 +984,4 @@ with tab5:
         if st.button("🗑️ Clear Old Records (>30 days)"):
             removed = registry.clear_old_records(30)
             if removed > 0:
-               
+                st.success(f"Removed {removed} old records
