@@ -448,4 +448,26 @@ class SemanticEventNormalizer:
     def _summary(conditions: list) -> dict:
         if not conditions:
             return {
-                "
+                "total_conditions": 0,
+                "active_conditions": 0,
+                "uncertain_conditions": 0,
+                "negative_conditions": 0,
+                "historical_conditions": 0,
+                "reported_conditions": 0,
+                "confirmed_conditions": 0,
+                "average_confidence": 0.0,
+            }
+
+        states = [c["semantic_state"] for c in conditions]
+        return {
+            "total_conditions": len(conditions),
+            "active_conditions": states.count("ACTIVE"),
+            "uncertain_conditions": states.count("UNCERTAIN"),
+            "negative_conditions": states.count("NEGATIVE"),
+            "historical_conditions": states.count("HISTORICAL"),
+            "reported_conditions": states.count("REPORTED"),
+            "confirmed_conditions": states.count("CONFIRMED"),
+            "average_confidence": round(
+                sum(c["confidence"] for c in conditions) / len(conditions), 3
+            ),
+        }
