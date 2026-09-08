@@ -444,7 +444,7 @@ class SemanticEventNormalizer:
             return "HIGH"
         return "LOW"
 
-        @staticmethod
+    @staticmethod
     def _summary(conditions: list) -> dict:
         if not conditions:
             return {
