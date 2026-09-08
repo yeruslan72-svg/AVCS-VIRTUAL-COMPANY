@@ -42,11 +42,98 @@ from core.authority_gate import AuthorityGate
 from core.state_machine import StateMachine
 
 # --- НОВЫЕ ИМПОРТЫ ДЛЯ v0.2 ---
-from core.event_normalizer import EventNormalizer
 from core.risk_engine import RiskEngine
 
 # --- НОВЫЙ ИМПОРТ ДЛЯ РЕЕСТРА ---
 from records.incident_registry import IncidentRegistry
+
+
+# =============================================================================
+# ВСТРОЕННАЯ ДИАГНОСТИКА (без external normalizer.py)
+# =============================================================================
+
+def extract_critical_conditions(text: str):
+    """
+    Встроенная диагностика — извлекает критические условия из текста.
+    Работает без внешнего модуля normalizer.py.
+    """
+    conditions = []
+    text_lower = text.lower()
+
+    # Ключевые слова для диагностики
+    keywords = {
+        "fire": {"severity": "CRITICAL", "keywords": ["fire", "flame", "burning", "ignition"]},
+        "smoke": {"severity": "HIGH", "keywords": ["smoke", "fume"]},
+        "evacuation": {"severity": "CRITICAL", "keywords": ["evacuate", "evacuating", "abandon"]},
+        "temperature": {"severity": "HIGH", "keywords": ["temperature", "heat", "overheat"]},
+        "oil_spill": {"severity": "CRITICAL", "keywords": ["oil", "spill", "leak", "pollution", "environmental"]},
+        "hull_breach": {"severity": "CRITICAL", "keywords": ["water ingress", "breach", "hull", "flood"]},
+        "man_overboard": {"severity": "CRITICAL", "keywords": ["overboard", "man overboard", "MOB"]},
+        "gas_leak": {"severity": "CRITICAL", "keywords": ["gas leak", "methane", "toxic"]},
+        "drone": {"severity": "HIGH", "keywords": ["drone", "uav", "unidentified"]},
+        "collision": {"severity": "CRITICAL", "keywords": ["collision", "impact", "strike"]},
+        "explosion": {"severity": "CRITICAL", "keywords": ["explosion", "blast", "boom"]},
+    }
+
+    # Паттерны для неопределённости
+    uncertainty_patterns = [
+        r"\bsuspected\s+", r"\bpossible\s+", r"\bprobable\s+",
+        r"\bprobably\s+", r"\bmaybe\s+", r"\bpotential\s+",
+        r"\bappears?\s*", r"\bseems?\s*", r"\bindicates?\s*",
+        r"\bsuggests?\s*"
+    ]
+
+    for condition_type, config in keywords.items():
+        for keyword in config["keywords"]:
+            if keyword not in text_lower:
+                continue
+
+            position = text_lower.find(keyword)
+
+            # Semantic Window: 50 символов до и после
+            window_start = max(0, position - 50)
+            window_end = min(len(text), position + len(keyword) + 50)
+            window_text = text[window_start:window_end].lower()
+
+            # Проверка на неопределённость
+            uncertainty_found = False
+            for pattern in uncertainty_patterns:
+                if re.search(pattern, window_text):
+                    uncertainty_found = True
+                    break
+
+            if uncertainty_found:
+                polarity = "NEUTRAL"
+                uncertainty = "HIGH"
+                confidence = 0.6
+                severity = config["severity"]
+            else:
+                polarity = "POSITIVE"
+                uncertainty = None
+                confidence = 0.8
+                severity = config["severity"]
+
+            start = max(0, position - 30)
+            end = min(len(text), position + 50)
+            context = text[start:end].strip()
+
+            conditions.append({
+                "condition": condition_type.upper(),
+                "severity": severity,
+                "keyword": keyword,
+                "context": context,
+                "polarity": polarity,
+                "confidence": confidence,
+                "uncertainty": uncertainty,
+                "negation_found": False,
+                "uncertainty_found": uncertainty_found,
+                "timestamp": datetime.utcnow().isoformat() + "Z",
+                "source": "INCIDENT_INPUT",
+                "status": "ACTIVE"
+            })
+            break
+
+    return conditions
 
 
 # --- Настройка страницы ---
@@ -311,6 +398,9 @@ with tab1:
             registry = IncidentRegistry()
             event_id = registry.generate_event_id()
 
+            # --- ИЗВЛЕКАЕМ КРИТИЧЕСКИЕ УСЛОВИЯ (ВСТРОЕННАЯ ДИАГНОСТИКА) ---
+            critical_conditions = extract_critical_conditions(incident_description)
+
             event_data = {
                 "event_id": event_id,
                 "description": incident_description,
@@ -319,13 +409,13 @@ with tab1:
                 "heading": heading,
                 "speed": speed,
                 "timestamp": datetime.utcnow().isoformat() + "Z",
-                "escalate": True
+                "escalate": True,
+                "critical_conditions": critical_conditions,
+                "critical_conditions_count": len(critical_conditions),
+                "has_critical": any(c.get("severity") == "CRITICAL" for c in critical_conditions),
+                "has_high": any(c.get("severity") == "HIGH" for c in critical_conditions),
+                "status": "NORMALIZED"
             }
-
-            # --- НОРМАЛИЗАЦИЯ СОБЫТИЯ (v0.2) ---
-            normalizer = EventNormalizer()
-            normalized_data = normalizer.normalize(event_data)
-            event_data = normalized_data
 
             # --- СОХРАНЯЕМ В РЕЕСТР ---
             registry.add_incident(event_data)
