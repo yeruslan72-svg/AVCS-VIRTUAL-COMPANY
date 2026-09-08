@@ -1,7 +1,7 @@
 """
 AVCS VIRTUAL COMPANY
 Streamlit UI — Operational Decision Dashboard
-Version: v0.3.8 — Semantic Integrity Embedded
+Version: v0.3.9 — Local Semantic Scope
 
 Purpose:
 - Normalize incident language before dispatch.
@@ -50,7 +50,7 @@ from records.incident_registry import IncidentRegistry
 
 
 # ===========================================================================
-# SEMANTIC EVENT NORMALIZER v0.3.8
+# SEMANTIC EVENT NORMALIZER v0.3.9
 # ===========================================================================
 
 class SemanticEventNormalizer:
@@ -279,28 +279,51 @@ class SemanticEventNormalizer:
         }
 
     def _extract(self, text: str) -> list:
-        text_lower = text.lower()
+        """
+        Extract conditions using sentence-local semantic scope.
+
+        Semantic modifiers cannot cross a sentence boundary. A modifier must
+        also be close to the detected condition phrase.
+        """
         found = []
+
+        sentence_spans = list(
+            re.finditer(r"[^.!?]+(?:[.!?]+|$)", text, flags=re.DOTALL)
+        )
 
         for condition_type, config in self.CONDITIONS.items():
             best = None
 
             for pattern in config["patterns"]:
-                match = re.search(pattern, text_lower, flags=re.IGNORECASE)
+                match = re.search(pattern, text, flags=re.IGNORECASE)
                 if not match:
                     continue
 
-                start = max(0, match.start() - self.WINDOW_BEFORE)
-                end = min(len(text_lower), match.end() + self.WINDOW_AFTER)
-                window = text_lower[start:end]
+                sentence = self._sentence_for_position(
+                    text, match.start(), sentence_spans
+                )
+                sentence_start = sentence["start"]
+                sentence_text = sentence["text"]
 
-                semantic_state = self._classify(window)
+                local_position = match.start() - sentence_start
+                local_end = match.end() - sentence_start
+
+                before = sentence_text[:local_position]
+                after = sentence_text[local_end:]
+
+                semantic_state = self._classify_local(
+                    before=before,
+                    after=after,
+                )
+
+                context_start = max(0, local_position - 70)
+                context_end = min(len(sentence_text), local_end + 70)
 
                 candidate = {
                     "condition": condition_type,
                     "severity": config["severity"],
                     "keyword": match.group(0),
-                    "context": text[max(0, start):min(len(text), end)].strip(),
+                    "context": sentence_text[context_start:context_end].strip(),
                     "semantic_state": semantic_state,
                     "polarity": self._polarity(semantic_state),
                     "confidence": self._confidence(semantic_state),
@@ -309,23 +332,137 @@ class SemanticEventNormalizer:
                     ),
                     "negation_found": semantic_state == "NEGATIVE",
                     "uncertainty_found": semantic_state == "UNCERTAIN",
-                    "temporal_context": self._temporal_context(window),
+                    "temporal_context": self._temporal_context_local(
+                        before, after
+                    ),
                     "timestamp": datetime.now(timezone.utc).isoformat(),
                     "source": "INCIDENT_INPUT",
-                    "status": "ACTIVE" if semantic_state != "NEGATIVE" else "EXCLUDED",
+                    "status": (
+                        "ACTIVE"
+                        if semantic_state not in ("NEGATIVE", "HISTORICAL")
+                        else "EXCLUDED"
+                    ),
                 }
 
-                # Prefer the strongest semantic interpretation if multiple
-                # patterns for the same condition match.
-                if best is None or self._state_rank(semantic_state) > self._state_rank(
-                    best["semantic_state"]
-                ):
+                if best is None or self._state_rank(
+                    semantic_state
+                ) > self._state_rank(best["semantic_state"]):
                     best = candidate
 
             if best:
                 found.append(best)
 
         return found
+
+    @staticmethod
+    def _sentence_for_position(text: str, position: int, spans: list) -> dict:
+        for span in spans:
+            if span.start() <= position < span.end():
+                return {
+                    "start": span.start(),
+                    "end": span.end(),
+                    "text": span.group(0),
+                }
+
+        return {"start": 0, "end": len(text), "text": text}
+
+    @staticmethod
+    def _local_modifier_before(
+        before: str, patterns: list, max_words: int = 7
+    ) -> bool:
+        words = re.findall(r"\b[\w'-]+\b", before.lower())
+        tail = " ".join(words[-max_words:])
+        return any(
+            re.search(pattern, tail, flags=re.IGNORECASE)
+            for pattern in patterns
+        )
+
+    @staticmethod
+    def _local_modifier_after(
+        after: str, patterns: list, max_words: int = 7
+    ) -> bool:
+        words = re.findall(r"\b[\w'-]+\b", after.lower())
+        head = " ".join(words[:max_words])
+        return any(
+            re.search(pattern, head, flags=re.IGNORECASE)
+            for pattern in patterns
+        )
+
+    def _classify_local(self, before: str, after: str) -> str:
+        # Modifiers are evaluated only within the same sentence and local
+        # word scope. Therefore "No injuries." cannot modify "water ingress"
+        # in the next sentence.
+
+        if self._local_modifier_before(
+            before, self.HISTORICAL_PATTERNS, max_words=7
+        ):
+            return "HISTORICAL"
+
+        if self._local_modifier_before(
+            before, self.NEGATION_PATTERNS, max_words=7
+        ):
+            return "NEGATIVE"
+
+        if (
+            self._local_modifier_before(
+                before, self.UNCERTAINTY_PATTERNS, max_words=7
+            )
+            or self._local_modifier_after(
+                after, self.UNCERTAINTY_PATTERNS, max_words=7
+            )
+        ):
+            return "UNCERTAIN"
+
+        if (
+            self._local_modifier_before(
+                before, self.CONFIRMED_PATTERNS, max_words=7
+            )
+            or self._local_modifier_after(
+                after, self.CONFIRMED_PATTERNS, max_words=7
+            )
+        ):
+            return "CONFIRMED"
+
+        if (
+            self._local_modifier_before(
+                before, self.REPORTED_PATTERNS, max_words=7
+            )
+            or self._local_modifier_after(
+                after, self.REPORTED_PATTERNS, max_words=7
+            )
+        ):
+            return "REPORTED"
+
+        return "ACTIVE"
+
+    @staticmethod
+    def _temporal_context_local(before: str, after: str):
+        if SemanticEventNormalizer._local_modifier_before(
+            before, SemanticEventNormalizer.HISTORICAL_PATTERNS, max_words=7
+        ):
+            return "PREVIOUS"
+
+        if (
+            SemanticEventNormalizer._local_modifier_before(
+                before, SemanticEventNormalizer.CONFIRMED_PATTERNS, max_words=7
+            )
+            or SemanticEventNormalizer._local_modifier_after(
+                after, SemanticEventNormalizer.CONFIRMED_PATTERNS, max_words=7
+            )
+        ):
+            return "CONFIRMED"
+
+        if (
+            SemanticEventNormalizer._local_modifier_before(
+                before, SemanticEventNormalizer.REPORTED_PATTERNS, max_words=7
+            )
+            or SemanticEventNormalizer._local_modifier_after(
+                after, SemanticEventNormalizer.REPORTED_PATTERNS, max_words=7
+            )
+        ):
+            return "REPORTED"
+
+        return "CURRENT"
 
     def _classify(self, window: str) -> str:
         # Historical context has priority over a simple positive mention.
@@ -461,7 +598,7 @@ st.set_page_config(
 )
 
 st.title("AVCS VIRTUAL COMPANY")
-st.caption("Operational Decision Dashboard — v0.3.8 Semantic Integrity")
+st.caption("Operational Decision Dashboard — v0.3.9 Local Semantic Scope")
 
 normalizer = SemanticEventNormalizer()
 
@@ -659,7 +796,6 @@ AVCS DECISION RECORD
         )
 
     st.caption(
-        "v0.3.8 principle: the system must not confuse "
-        "absence of evidence, uncertainty, historical information, "
-        "and an active operational condition."
+        "v0.3.9 principle: semantic modifiers are applied locally, "
+        "within the same sentence, and cannot cross sentence boundaries."
     )
