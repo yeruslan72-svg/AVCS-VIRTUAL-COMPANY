@@ -7,10 +7,10 @@ Version: v0.4.1 — Full Combat Machine with Welcome Screen
 import os
 import re
 import sys
+import json
 from datetime import datetime, timezone
 
 import streamlit as st
-import json
 
 # ---------------------------------------------------------------------------
 # Project path
@@ -950,97 +950,42 @@ with tab5:
         filter_status = st.selectbox("Filter by Status", ["All"] + list(stats["by_status"].keys()))
     
     filtered_incidents = incidents
-       if filter_type != "All":
-    filtered_incidents = [
-        i for i in filtered_incidents
-        if i.get("event_type") == filter_type
-    ]
-
-if filter_status != "All":
-    filtered_incidents = [
-        i for i in filtered_incidents
-        if i.get("status") == filter_status
-    ]
-
-if not filtered_incidents:
-    st.info("No incidents found.")
-else:
-    st.write(
-        f"Showing {len(filtered_incidents)} "
-        f"of {len(incidents)} incidents"
-    )
-
-    for incident in reversed(filtered_incidents[-50:]):
-        event_id = incident.get("event_id", "UNKNOWN")
-        event_type = incident.get("event_type", "UNKNOWN")
-        status = incident.get("status", "UNKNOWN")
-
-        with st.expander(
-            f"{event_id} — {event_type} ({status})"
-        ):
-            col1, col2 = st.columns(2)
-
-            with col1:
-                st.write(
-                    f"**Description:** "
-                    f"{incident.get('description', 'N/A')}"
-                )
-                st.write(
-                    f"**Severity:** "
-                    f"{incident.get('severity', 'UNKNOWN')}"
-                )
-                st.write(
-                    f"**Authorized:** "
-                    f"{incident.get('authorized', False)}"
-                )
-
-            with col2:
-                st.write(
-                    f"**Timestamp:** "
-                    f"{incident.get('timestamp', 'N/A')}"
-                )
-
-                if incident.get("critical_conditions"):
-                    st.write("**Critical Conditions:**")
-
-                    for cond in incident.get(
-                        "critical_conditions", []
-                    ):
-                        st.write(
-                            f"- {cond.get('condition')} "
-                            f"({cond.get('severity')})"
-                        )
-
-            if st.button(
-                "View Record",
-                key=f"view_{event_id}"
-            ):
-                st.json(
-                    incident.get("record", {})
-                )
-
-st.divider()
-
-col1, col2 = st.columns(2)
-
-with col1:
-    if st.button("🗑️ Clear Old Records (>30 days)"):
-        removed = registry.clear_old_records(30)
-
-        if removed > 0:
-            st.success(f"Removed {removed} old records.")
-        else:
-            st.info("No records older than 30 days.")
-
-        st.rerun()
-
-with col2:
-    if st.button("🗑️ Clear All Records (Danger)"):
-        confirm = st.checkbox(
-            "I understand this will delete ALL records"
-        )
-
-        if confirm:
-            count = registry.clear_all()
-            st.warning(f"Deleted {count} records.")
+    if filter_type != "All":
+        filtered_incidents = [i for i in filtered_incidents if i.get("event_type") == filter_type]
+    if filter_status != "All":
+        filtered_incidents = [i for i in filtered_incidents if i.get("status") == filter_status]
+    
+    if not filtered_incidents:
+        st.info("No incidents found.")
+    else:
+        st.write(f"Showing {len(filtered_incidents)} of {len(incidents)} incidents")
+        
+        for incident in reversed(filtered_incidents[-50:]):
+            with st.expander(f"{incident['event_id']} — {incident['event_type']} ({incident['status']})"):
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.write(f"**Description:** {incident.get('description', 'N/A')}")
+                    st.write(f"**Severity:** {incident.get('severity', 'UNKNOWN')}")
+                    st.write(f"**Authorized:** {incident.get('authorized', False)}")
+                with col2:
+                    st.write(f"**Timestamp:** {incident.get('timestamp', 'N/A')}")
+                    if incident.get("critical_conditions"):
+                        st.write("**Critical Conditions:**")
+                        for cond in incident.get("critical_conditions", []):
+                            st.write(f"- {cond.get('condition')} ({cond.get('severity')})")
+                
+                if st.button(f"View Record", key=f"view_{incident['event_id']}"):
+                    st.json(incident.get("record", {}))
+    
+    st.divider()
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("🗑️ Clear Old Records (>30 days)"):
+            removed = registry.clear_old_records(30)
+            if removed > 0:
+                st.success(f"Removed {removed} old records.")
+            else:
+                st.info("No records older than 30 days.")
             st.rerun()
+    
