@@ -1,22 +1,35 @@
 """
 AVCS VIRTUAL COMPANY
 Streamlit UI — Operational Decision Dashboard
-Version: v0.3.7 — Embedded Semantic Event Normalizer
+Version: v0.3.8 — Semantic Integrity Embedded
+
+Purpose:
+- Normalize incident language before dispatch.
+- Preserve ACTIVE / UNCERTAIN / NEGATIVE / HISTORICAL semantic states.
+- Avoid false positives from broad single-word matches.
+- Produce a stable event contract for the existing AVCS pipeline.
+
+No external normalizer.py is required.
 """
 
-import sys
 import os
-import streamlit as st
-import json
-from datetime import datetime
 import re
+import sys
+from datetime import datetime, timezone
 
-# Добавляем корневую папку проекта в sys.path
-root_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-if root_path not in sys.path:
-    sys.path.insert(0, root_path)
+import streamlit as st
 
-# Импорт департаментов и других компонентов
+# ---------------------------------------------------------------------------
+# Project path
+# ---------------------------------------------------------------------------
+ROOT_PATH = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if ROOT_PATH not in sys.path:
+    sys.path.insert(0, ROOT_PATH)
+
+
+# ---------------------------------------------------------------------------
+# Existing AVCS components
+# ---------------------------------------------------------------------------
 from core.departments import (
     LookoutDepartment,
     ChartsDepartment,
@@ -36,219 +49,617 @@ from core.risk_engine import RiskEngine
 from records.incident_registry import IncidentRegistry
 
 
-# =============================================================================
-# ВСТРОЕННЫЙ SEMANTIC EVENT NORMALIZER v0.3.7
-# =============================================================================
+# ===========================================================================
+# SEMANTIC EVENT NORMALIZER v0.3.8
+# ===========================================================================
 
 class SemanticEventNormalizer:
     """
-    Встроенный нормализатор событий с полной семантикой:
-    - Обнаружение ключевых слов
-    - Отрицание (no, not, without, ruled out)
-    - Неопределённость (suspected, possible, appears)
-    - Временной контекст (previous, reported, current)
-    - Единый контракт для critical_conditions
+    AVCS semantic layer.
+
+    Important design rule:
+        UNCERTAIN != ABSENT
+        HISTORICAL != ACTIVE
+        REPORTED != CONFIRMED
+
+    The normalizer therefore keeps semantic evidence instead of silently
+    deleting everything that is not an active positive condition.
     """
 
-    CRITICAL_KEYWORDS = {
-        "fire": {"severity": "CRITICAL", "keywords": ["fire", "flame", "burning", "ignition"]},
-        "smoke": {"severity": "HIGH", "keywords": ["smoke", "fume"]},
-        "evacuation": {"severity": "CRITICAL", "keywords": ["evacuate", "evacuating", "abandon"]},
-        "temperature": {"severity": "HIGH", "keywords": ["temperature", "heat", "overheat"]},
-        "oil_spill": {"severity": "CRITICAL", "keywords": ["oil", "spill", "leak", "pollution", "environmental"]},
-        "hull_breach": {"severity": "CRITICAL", "keywords": ["water ingress", "breach", "hull", "flood"]},
-        "man_overboard": {"severity": "CRITICAL", "keywords": ["overboard", "man overboard", "MOB"]},
-        "gas_leak": {"severity": "CRITICAL", "keywords": ["gas leak", "methane", "toxic"]},
-        "drone": {"severity": "HIGH", "keywords": ["drone", "uav", "unidentified"]},
-        "collision": {"severity": "CRITICAL", "keywords": ["collision", "impact", "strike"]},
-        "explosion": {"severity": "CRITICAL", "keywords": ["explosion", "blast", "boom"]},
+    # Exact phrases are preferred over dangerous single-word matches.
+    CONDITIONS = {
+        "FIRE": {
+            "severity": "CRITICAL",
+            "patterns": [
+                r"\bfire\b",
+                r"\bflames?\b",
+                r"\bflaming\b",
+                r"\bignition\b",
+                r"\bburning\b",
+            ],
+        },
+        "SMOKE": {
+            "severity": "HIGH",
+            "patterns": [
+                r"\bsmoke\b",
+                r"\bfumes?\b",
+            ],
+        },
+        "EVACUATION": {
+            "severity": "CRITICAL",
+            "patterns": [
+                r"\bevacuate\b",
+                r"\bevacuation\b",
+                r"\bevacuat(?:ing|ed)\b",
+                r"\babandon ship\b",
+            ],
+        },
+        "TEMPERATURE": {
+            "severity": "HIGH",
+            "patterns": [
+                r"\boverheat(?:ing)?\b",
+                r"\btemperature\s+(?:is\s+)?(?:rising|high|elevated)\b",
+                r"\bhigh\s+temperature\b",
+                r"\btemperature\s+alarm\b",
+            ],
+        },
+        "OIL_SPILL": {
+            "severity": "CRITICAL",
+            "patterns": [
+                r"\boil spill\b",
+                r"\boil leak\b",
+                r"\boil leakage\b",
+                r"\boil pollution\b",
+                r"\bhydrocarbon spill\b",
+                r"\bhydrocarbon leak\b",
+            ],
+        },
+        "HULL_BREACH": {
+            "severity": "CRITICAL",
+            "patterns": [
+                r"\bwater ingress\b",
+                r"\bhull breach\b",
+                r"\bhull damage\b",
+                r"\bhull failure\b",
+                r"\bflooding\b",
+                r"\bflooded\b",
+            ],
+        },
+        "MAN_OVERBOARD": {
+            "severity": "CRITICAL",
+            "patterns": [
+                r"\bman overboard\b",
+                r"\bperson overboard\b",
+                r"\bperson in the water\b",
+                r"\bMOB\b",
+            ],
+        },
+        "GAS_LEAK": {
+            "severity": "CRITICAL",
+            "patterns": [
+                r"\bgas leak\b",
+                r"\bgas leakage\b",
+                r"\bmethane leak\b",
+                r"\btoxic gas\b",
+            ],
+        },
+        "DRONE": {
+            "severity": "HIGH",
+            "patterns": [
+                r"\bdrone\b",
+                r"\bUAV\b",
+                r"\bunidentified drone\b",
+            ],
+        },
+        "COLLISION": {
+            "severity": "CRITICAL",
+            "patterns": [
+                r"\bcollision\b",
+                r"\bcollided\b",
+                r"\bimpact with\b",
+                r"\bstruck by\b",
+                r"\bstruck\b",
+            ],
+        },
+        "EXPLOSION": {
+            "severity": "CRITICAL",
+            "patterns": [
+                r"\bexplosion\b",
+                r"\bexploded\b",
+                r"\bblast\b",
+            ],
+        },
     }
 
     NEGATION_PATTERNS = [
-        r"\bno\s+", r"\bnot\s+", r"\bwithout\s+",
-        r"\bnever\s+", r"\bruled\s+out\s*", r"\bexcluded\s*",
-        r"\babsent\s*", r"\bnot\s+detected\s*", r"\bno\s+evidence\s*"
+        r"\bno\b",
+        r"\bnot\b",
+        r"\bwithout\b",
+        r"\bnever\b",
+        r"\bruled\s+out\b",
+        r"\bexcluded\b",
+        r"\babsent\b",
+        r"\bno\s+evidence\s+of\b",
+        r"\bnot\s+detected\b",
+        r"\bwas\s+not\s+detected\b",
     ]
 
     UNCERTAINTY_PATTERNS = [
-        r"\bsuspected\s+", r"\bpossible\s+", r"\bprobable\s+",
-        r"\bprobably\s+", r"\bmaybe\s+", r"\bpotential\s+",
-        r"\bappears?\s*", r"\bseems?\s*", r"\bindicates?\s*",
-        r"\bsuggests?\s*"
+        r"\bsuspected\b",
+        r"\bsuspect\b",
+        r"\bpossible\b",
+        r"\bpossibly\b",
+        r"\bprobable\b",
+        r"\bprobably\b",
+        r"\bmaybe\b",
+        r"\bpotential\b",
+        r"\bpotentially\b",
+        r"\bappears?\b",
+        r"\bseems?\b",
+        r"\bindicates?\b",
+        r"\bsuggests?\b",
     ]
 
-    TEMPORAL_PATTERNS = {
-        "previous": [r"\bprevious\s+", r"\bprior\s+", r"\bhistorical\s+", r"\bearlier\s+"],
-        "reported": [r"\breported\s+", r"\bstated\s+", r"\baccording to\s+"],
-        "current": [r"\bcurrent\s+", r"\bnow\s+", r"\bat this time\s+"],
-        "confirmed": [r"\bconfirmed\s+", r"\bverified\s+", r"\bvalidated\s+"],
-    }
+    HISTORICAL_PATTERNS = [
+        r"\bprevious\b",
+        r"\bprior\b",
+        r"\bhistorical\b",
+        r"\bearlier\b",
+        r"\blast\s+shift\b",
+        r"\blast\s+week\b",
+        r"\byesterday\b",
+    ]
+
+    REPORTED_PATTERNS = [
+        r"\breported\b",
+        r"\breports?\b",
+        r"\bstated\b",
+        r"\baccording\s+to\b",
+    ]
+
+    CONFIRMED_PATTERNS = [
+        r"\bconfirmed\b",
+        r"\bverified\b",
+        r"\bvalidated\b",
+    ]
+
+    # Negation must be close to the detected phrase.
+    WINDOW_BEFORE = 70
+    WINDOW_AFTER = 70
 
     def normalize(self, text: str) -> dict:
-        """
-        Полная нормализация текста события.
-        Возвращает:
-        - critical_conditions: список условий
-        - event_type: определённый тип события
-        - severity: общий уровень серьёзности
-        - semantic_summary: сводка по семантике
-        """
-        conditions = self._extract_critical_conditions(text)
-        event_type = self._determine_event_type(conditions)
-        severity = self._determine_overall_severity(conditions)
-        semantic_summary = self._build_semantic_summary(conditions)
+        text = (text or "").strip()
+
+        if not text:
+            return {
+                "critical_conditions": [],
+                "critical_conditions_count": 0,
+                "event_type": "GENERAL",
+                "severity": "LOW",
+                "has_critical": False,
+                "has_high": False,
+                "semantic_summary": {
+                    "total_conditions": 0,
+                    "active_conditions": 0,
+                    "uncertain_conditions": 0,
+                    "negative_conditions": 0,
+                    "historical_conditions": 0,
+                    "reported_conditions": 0,
+                    "confirmed_conditions": 0,
+                    "average_confidence": 0.0,
+                },
+                "status": "NORMALIZED",
+            }
+
+        conditions = self._extract(text)
+        active = [
+            c for c in conditions
+            if c["semantic_state"] in ("ACTIVE", "UNCERTAIN", "REPORTED", "CONFIRMED")
+        ]
+
+        # Event type is selected from active evidence only.
+        event_type = self._determine_event_type(active)
+        severity = self._determine_overall_severity(active)
 
         return {
             "critical_conditions": conditions,
             "critical_conditions_count": len(conditions),
             "event_type": event_type,
             "severity": severity,
-            "has_critical": any(c.get("severity") == "CRITICAL" for c in conditions),
-            "has_high": any(c.get("severity") == "HIGH" for c in conditions),
-            "semantic_summary": semantic_summary,
-            "status": "NORMALIZED"
+            "has_critical": any(
+                c["severity"] == "CRITICAL" and c["semantic_state"] != "NEGATIVE"
+                for c in active
+            ),
+            "has_high": any(
+                c["severity"] == "HIGH" and c["semantic_state"] != "NEGATIVE"
+                for c in active
+            ),
+            "semantic_summary": self._summary(conditions),
+            "status": "NORMALIZED",
         }
 
-    def _extract_critical_conditions(self, text: str) -> list:
-        """Извлечение критических условий с полной семантикой."""
-        conditions = []
+    def _extract(self, text: str) -> list:
         text_lower = text.lower()
+        found = []
 
-        for condition_type, config in self.CRITICAL_KEYWORDS.items():
-            for keyword in config["keywords"]:
-                if keyword not in text_lower:
+        for condition_type, config in self.CONDITIONS.items():
+            best = None
+
+            for pattern in config["patterns"]:
+                match = re.search(pattern, text_lower, flags=re.IGNORECASE)
+                if not match:
                     continue
 
-                position = text_lower.find(keyword)
+                start = max(0, match.start() - self.WINDOW_BEFORE)
+                end = min(len(text_lower), match.end() + self.WINDOW_AFTER)
+                window = text_lower[start:end]
 
-                # Semantic Window
-                window_start = max(0, position - 50)
-                window_end = min(len(text), position + len(keyword) + 50)
-                window_text = text[window_start:window_end].lower()
+                semantic_state = self._classify(window)
 
-                # --- ОТРИЦАНИЕ ---
-                negation_found = False
-                for pattern in self.NEGATION_PATTERNS:
-                    if re.search(pattern, window_text):
-                        negation_found = True
-                        break
-
-                if negation_found:
-                    continue  # Пропускаем условие
-
-                # --- ВРЕМЕННОЙ КОНТЕКСТ ---
-                temporal_context = None
-                for ctx_type, patterns in self.TEMPORAL_PATTERNS.items():
-                    for pattern in patterns:
-                        if re.search(pattern, window_text):
-                            temporal_context = ctx_type.upper()
-                            break
-                    if temporal_context:
-                        break
-
-                if temporal_context == "PREVIOUS":
-                    continue  # Пропускаем историческое упоминание
-
-                # --- НЕОПРЕДЕЛЁННОСТЬ ---
-                uncertainty_found = False
-                for pattern in self.UNCERTAINTY_PATTERNS:
-                    if re.search(pattern, window_text):
-                        uncertainty_found = True
-                        break
-
-                # --- ОПРЕДЕЛЕНИЕ СТАТУСА ---
-                if uncertainty_found:
-                    polarity = "NEUTRAL"
-                    uncertainty = "HIGH"
-                    confidence = 0.6
-                    severity = config["severity"]
-                else:
-                    polarity = "POSITIVE"
-                    uncertainty = None
-                    confidence = 0.8
-                    severity = config["severity"]
-
-                # Контекст
-                start = max(0, position - 30)
-                end = min(len(text), position + 50)
-                context = text[start:end].strip()
-
-                conditions.append({
-                    "condition": condition_type.upper(),
-                    "severity": severity,
-                    "keyword": keyword,
-                    "context": context,
-                    "polarity": polarity,
-                    "confidence": confidence,
-                    "uncertainty": uncertainty,
-                    "negation_found": False,
-                    "uncertainty_found": uncertainty_found,
-                    "temporal_context": temporal_context,
-                    "timestamp": datetime.utcnow().isoformat() + "Z",
+                candidate = {
+                    "condition": condition_type,
+                    "severity": config["severity"],
+                    "keyword": match.group(0),
+                    "context": text[max(0, start):min(len(text), end)].strip(),
+                    "semantic_state": semantic_state,
+                    "polarity": self._polarity(semantic_state),
+                    "confidence": self._confidence(semantic_state),
+                    "uncertainty": (
+                        "HIGH" if semantic_state == "UNCERTAIN" else None
+                    ),
+                    "negation_found": semantic_state == "NEGATIVE",
+                    "uncertainty_found": semantic_state == "UNCERTAIN",
+                    "temporal_context": self._temporal_context(window),
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
                     "source": "INCIDENT_INPUT",
-                    "status": "ACTIVE"
-                })
-                break
+                    "status": "ACTIVE" if semantic_state != "NEGATIVE" else "EXCLUDED",
+                }
 
-        return conditions
+                # Prefer the strongest semantic interpretation if multiple
+                # patterns for the same condition match.
+                if best is None or self._state_rank(semantic_state) > self._state_rank(
+                    best["semantic_state"]
+                ):
+                    best = candidate
 
-    def _determine_event_type(self, conditions: list) -> str:
-        """Определение типа события."""
+            if best:
+                found.append(best)
+
+        return found
+
+    def _classify(self, window: str) -> str:
+        # Historical context has priority over a simple positive mention.
+        if self._matches(window, self.HISTORICAL_PATTERNS):
+            return "HISTORICAL"
+
+        if self._matches(window, self.NEGATION_PATTERNS):
+            return "NEGATIVE"
+
+        if self._matches(window, self.UNCERTAINTY_PATTERNS):
+            return "UNCERTAIN"
+
+        if self._matches(window, self.CONFIRMED_PATTERNS):
+            return "CONFIRMED"
+
+        if self._matches(window, self.REPORTED_PATTERNS):
+            return "REPORTED"
+
+        return "ACTIVE"
+
+    @staticmethod
+    def _matches(text: str, patterns: list) -> bool:
+        return any(re.search(p, text, flags=re.IGNORECASE) for p in patterns)
+
+    @staticmethod
+    def _state_rank(state: str) -> int:
+        return {
+            "NEGATIVE": 0,
+            "HISTORICAL": 1,
+            "REPORTED": 2,
+            "UNCERTAIN": 3,
+            "ACTIVE": 4,
+            "CONFIRMED": 5,
+        }.get(state, 0)
+
+    @staticmethod
+    def _polarity(state: str) -> str:
+        if state == "NEGATIVE":
+            return "NEGATIVE"
+        if state == "UNCERTAIN":
+            return "NEUTRAL"
+        return "POSITIVE"
+
+    @staticmethod
+    def _confidence(state: str) -> float:
+        return {
+            "NEGATIVE": 0.95,
+            "HISTORICAL": 0.90,
+            "REPORTED": 0.70,
+            "UNCERTAIN": 0.60,
+            "ACTIVE": 0.80,
+            "CONFIRMED": 0.95,
+        }.get(state, 0.50)
+
+    def _temporal_context(self, window: str):
+        if self._matches(window, self.HISTORICAL_PATTERNS):
+            return "PREVIOUS"
+        if self._matches(window, self.CONFIRMED_PATTERNS):
+            return "CONFIRMED"
+        if self._matches(window, self.REPORTED_PATTERNS):
+            return "REPORTED"
+        return "CURRENT"
+
+    @staticmethod
+    def _determine_event_type(conditions: list) -> str:
         if not conditions:
             return "GENERAL"
-        for c in conditions:
-            if c.get("severity") == "CRITICAL":
-                return c["condition"]
-        for c in conditions:
-            if c.get("severity") == "HIGH":
-                return c["condition"]
+
+        # Criticality first; confidence is a secondary discriminator.
+        critical = [c for c in conditions if c["severity"] == "CRITICAL"]
+        if critical:
+            critical.sort(
+                key=lambda c: (
+                    SemanticEventNormalizer._state_rank(c["semantic_state"]),
+                    c["confidence"],
+                ),
+                reverse=True,
+            )
+            return critical[0]["condition"]
+
+        high = [c for c in conditions if c["severity"] == "HIGH"]
+        if high:
+            high.sort(key=lambda c: c["confidence"], reverse=True)
+            return high[0]["condition"]
+
         return conditions[0]["condition"]
 
-    def _determine_overall_severity(self, conditions: list) -> str:
-        """Определение общего уровня серьёзности."""
-        if any(c.get("severity") == "CRITICAL" for c in conditions):
+    @staticmethod
+    def _determine_overall_severity(conditions: list) -> str:
+        if any(c["severity"] == "CRITICAL" for c in conditions):
             return "CRITICAL"
-        if any(c.get("severity") == "HIGH" for c in conditions):
+        if any(c["severity"] == "HIGH" for c in conditions):
             return "HIGH"
         return "LOW"
 
-    def _build_semantic_summary(self, conditions: list) -> dict:
-        """Сводка по семантике."""
+    @staticmethod
+    def _summary(conditions: list) -> dict:
         if not conditions:
             return {
                 "total_conditions": 0,
-                "polarities": {},
-                "uncertainties": [],
-                "average_confidence": 0.0
+                "active_conditions": 0,
+                "uncertain_conditions": 0,
+                "negative_conditions": 0,
+                "historical_conditions": 0,
+                "reported_conditions": 0,
+                "confirmed_conditions": 0,
+                "average_confidence": 0.0,
             }
 
-        polarities = {}
-        uncertainties = []
-        total_confidence = 0.0
-
-        for cond in conditions:
-            polarity = cond.get("polarity", "UNKNOWN")
-            polarities[polarity] = polarities.get(polarity, 0) + 1
-            if cond.get("uncertainty"):
-                uncertainties.append(cond.get("uncertainty"))
-            total_confidence += cond.get("confidence", 0.8)
-
+        states = [c["semantic_state"] for c in conditions]
         return {
             "total_conditions": len(conditions),
-            "polarities": polarities,
-            "uncertainties": uncertainties,
-            "average_confidence": total_confidence / len(conditions),
-            "has_negation": polarities.get("NEGATIVE", 0) > 0,
-            "has_uncertainty": len(uncertainties) > 0
+            "active_conditions": states.count("ACTIVE"),
+            "uncertain_conditions": states.count("UNCERTAIN"),
+            "negative_conditions": states.count("NEGATIVE"),
+            "historical_conditions": states.count("HISTORICAL"),
+            "reported_conditions": states.count("REPORTED"),
+            "confirmed_conditions": states.count("CONFIRMED"),
+            "average_confidence": round(
+                sum(c["confidence"] for c in conditions) / len(conditions), 3
+            ),
         }
 
 
-# --- Настройка страницы ---
+# ===========================================================================
+# STREAMLIT UI
+# ===========================================================================
+
 st.set_page_config(
     page_title="AVCS Virtual Company",
     page_icon="🧭",
-    layout="wide"
+    layout="wide",
 )
 
-# ... (остальная часть кода остаётся без изменений, начиная с приветственной страницы и далее)
-# Я продолжу в следующем сообщении, чтобы не превысить лимит.
+st.title("AVCS VIRTUAL COMPANY")
+st.caption("Operational Decision Dashboard — v0.3.8 Semantic Integrity")
+
+normalizer = SemanticEventNormalizer()
+
+if "last_normalized_event" not in st.session_state:
+    st.session_state.last_normalized_event = None
+
+if "event_counter" not in st.session_state:
+    st.session_state.event_counter = 0
+
+st.markdown(
+    """
+### Operational Decision Architecture
+
+`INCIDENT → SEMANTIC STATE → DISPATCHER → 7 Dpts. → AGGREGATION → CONFLICT → DECISION → AUTHORITY → EXECUTION → RECORD`
+"""
+)
+
+with st.sidebar:
+    st.header("Event Input")
+
+    incident_description = st.text_area(
+        "Incident Description",
+        height=180,
+        placeholder=(
+            "Example: Collision with fishing vessel. "
+            "Water ingress suspected."
+        ),
+    )
+
+    object_name = st.text_input("Object / Vessel", "")
+    position = st.text_input("Position", "")
+    heading = st.text_input("Heading", "")
+    speed = st.text_input("Speed", "")
+
+    process_event = st.button(
+        "PROCESS EVENT",
+        type="primary",
+        use_container_width=True,
+    )
+
+    reset_event = st.button(
+        "RESET",
+        use_container_width=True,
+    )
+
+if reset_event:
+    st.session_state.last_normalized_event = None
+    st.rerun()
+
+# ---------------------------------------------------------------------------
+# NORMALIZATION
+# ---------------------------------------------------------------------------
+
+if process_event:
+    if not incident_description.strip():
+        st.warning("Please enter an incident description.")
+    else:
+        normalized = normalizer.normalize(incident_description)
+
+        st.session_state.event_counter += 1
+        event_id = (
+            f"EVT-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}"
+            f"-{st.session_state.event_counter:03d}"
+        )
+
+        event_data = {
+            "event_id": event_id,
+            "description": incident_description,
+            "object": object_name,
+            "position": position,
+            "heading": heading,
+            "speed": speed,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "event_type": normalized["event_type"],
+            "severity": normalized["severity"],
+            "critical_conditions": normalized["critical_conditions"],
+            "critical_conditions_count": normalized["critical_conditions_count"],
+            "has_critical": normalized["has_critical"],
+            "has_high": normalized["has_high"],
+            "semantic_summary": normalized["semantic_summary"],
+            "status": normalized["status"],
+        }
+
+        st.session_state.last_normalized_event = event_data
+
+
+# ---------------------------------------------------------------------------
+# RESULTS
+# ---------------------------------------------------------------------------
+
+event = st.session_state.last_normalized_event
+
+if event is None:
+    st.info(
+        "Enter an incident and select PROCESS EVENT. "
+        "The semantic layer will normalize the event before operational dispatch."
+    )
+else:
+    st.success(f"Event normalized: {event['event_id']}")
+
+    col1, col2, col3, col4 = st.columns(4)
+
+    col1.metric("Event Type", event["event_type"])
+    col2.metric("Severity", event["severity"])
+    col3.metric("Conditions", event["critical_conditions_count"])
+    col4.metric(
+        "Avg Confidence",
+        f"{event['semantic_summary']['average_confidence']:.2f}",
+    )
+
+    st.divider()
+
+    tab1, tab2, tab3 = st.tabs(
+        ["Semantic State", "Event Contract", "Architecture"]
+    )
+
+    with tab1:
+        st.subheader("Semantic Conditions")
+
+        if not event["critical_conditions"]:
+            st.info("No recognized critical/high operational condition.")
+        else:
+            for condition in event["critical_conditions"]:
+                state = condition["semantic_state"]
+
+                if state == "NEGATIVE":
+                    icon = "⚪"
+                elif state == "UNCERTAIN":
+                    icon = "🟡"
+                elif state == "HISTORICAL":
+                    icon = "🔵"
+                elif state == "REPORTED":
+                    icon = "🟠"
+                elif state == "CONFIRMED":
+                    icon = "🔴"
+                else:
+                    icon = "🔴"
+
+                st.markdown(
+                    f"### {icon} {condition['condition']} — {state}"
+                )
+
+                c1, c2, c3 = st.columns(3)
+                c1.write(f"**Severity:** {condition['severity']}")
+                c2.write(f"**Polarity:** {condition['polarity']}")
+                c3.write(f"**Confidence:** {condition['confidence']:.2f}")
+
+                st.write(
+                    f"**Context:** {condition['context']}"
+                )
+                st.write(
+                    f"**Temporal:** {condition['temporal_context']}  |  "
+                    f"**Negation:** {condition['negation_found']}  |  "
+                    f"**Uncertainty:** {condition['uncertainty_found']}"
+                )
+
+                st.divider()
+
+    with tab2:
+        st.subheader("AVCS Event Contract")
+        st.json(event)
+
+    with tab3:
+        st.subheader("Operational Architecture")
+
+        st.code(
+            """
+RAW INCIDENT
+      ↓
+SEMANTIC EVENT NORMALIZER
+      ↓
+SEMANTIC STATE
+ ACTIVE / UNCERTAIN / NEGATIVE / HISTORICAL / REPORTED / CONFIRMED
+      ↓
+CRITICAL CONDITION REGISTER
+      ↓
+AI DISPATCHER
+      ↓
+LOOKOUT Dpt. | CHARTS Dpt. | GYRO Dpt.
+NAVIGATOR Dpt. | COMPASS Dpt. | HELM Dpt. | CAPTAIN Dpt.
+      ↓
+AGGREGATION
+      ↓
+DECISION PROPOSAL
+      ↓
+AUTHORITY BOUNDARY
+      ↓
+HUMAN AUTHORITY
+      ↓
+EXECUTION
+      ↓
+AVCS DECISION RECORD
+            """.strip(),
+            language="text",
+        )
+
+    st.caption(
+        "v0.3.8 principle: the system must not confuse "
+        "absence of evidence, uncertainty, historical information, "
+        "and an active operational condition."
+    )
