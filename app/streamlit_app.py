@@ -975,16 +975,38 @@ with tab5:
                     if incident.get("critical_conditions"):
                         st.write("**Critical Conditions:**")
                         for cond in incident.get("critical_conditions", []):
-                            st.write(f"- {cond.get('condition')} ({cond.get('severity')})")
-                
-                if st.button(f"View Record", key=f"view_{incident['event_id']}"):
+                            st.write(
+                                f"- {cond.get('condition', 'UNKNOWN')} "
+                                f"({cond.get('severity', 'UNKNOWN')}) — "
+                                f"{cond.get('semantic_state', 'UNKNOWN')} "
+                                f"/ confidence {cond.get('confidence', 0):.2f}"
+                            )
+
+                if st.button(
+                    "View Record",
+                    key=f"view_{incident['event_id']}"
+                ):
                     st.json(incident.get("record", {}))
-    
+
     st.divider()
-    
+
     col1, col2 = st.columns(2)
     with col1:
         if st.button("🗑️ Clear Old Records (>30 days)"):
             removed = registry.clear_old_records(30)
             if removed > 0:
-                st.success(f"Removed {removed} old records
+                st.success(f"Removed {removed} old records.")
+            else:
+                st.info("No records older than 30 days.")
+            st.rerun()
+
+    with col2:
+        if st.button("🗑️ Clear All Records (Danger)"):
+            confirm = st.checkbox(
+                "I understand this will delete ALL records",
+                key="confirm_clear_all"
+            )
+            if confirm:
+                count = registry.clear_all()
+                st.warning(f"Deleted {count} records.")
+                st.rerun()
