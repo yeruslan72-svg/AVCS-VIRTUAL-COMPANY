@@ -542,11 +542,11 @@ if not st.session_state.welcome_shown:
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         try:
-            image_path = os.path.join(ROOT_PATH, "app", "north_is_not_negotiable.png")
+            image_path = os.path.join(ROOT_PATH, "app", "logo.png")
             if os.path.exists(image_path):
                 st.image(image_path, use_container_width=True)
             else:
-                st.warning("North image not found. Please check the file path.")
+                st.warning("Logo image not found. Please check the file path.")
         except Exception as e:
             st.error(f"Error loading image: {e}")
 
@@ -804,13 +804,16 @@ with tab2:
             st.session_state.authority_state = authority_state
             st.session_state.current_step = "authority"
 
+            # --- ИСПРАВЛЕНО: используем update_incident вместо add_incident ---
             registry = IncidentRegistry()
-            registry.add_incident({
-                **event_data,
-                "decision_proposal": decision_proposal,
-                "authorized": False,
-                "status": "AWAITING_AUTHORITY"
-            })
+            registry.update_incident(
+                st.session_state.event_id,
+                {
+                    "decision_proposal": decision_proposal,
+                    "authorized": False,
+                    "status": "AWAITING_AUTHORITY"
+                }
+            )
 
             st.rerun()
 
@@ -984,8 +987,4 @@ with tab5:
         if st.button("🗑️ Clear Old Records (>30 days)"):
             removed = registry.clear_old_records(30)
             if removed > 0:
-                st.success(f"Removed {removed} old records.")
-            else:
-                st.info("No records older than 30 days.")
-            st.rerun()
-    
+                st.success(f"Removed {removed} old records
