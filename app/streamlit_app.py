@@ -984,4 +984,6 @@ with tab5:
         if st.button("🗑️ Clear Old Records (>30 days)"):
             removed = registry.clear_old_records(30)
             if removed > 0:
-                st.success(f"Removed {removed} old records
+                st.success(f"Removed {removed} old records.")
+            else:
+                st.info("No records older than 30
