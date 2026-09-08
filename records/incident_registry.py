@@ -1,200 +1,156 @@
 """
 AVCS VIRTUAL COMPANY
-Incident Registry — Хранилище всех инцидентов
+Incident Registry — History Storage
+
+FUNCTION:
+- Store incident records
+- Retrieve incident history
+- Filter by type, severity, status
+- Update incident status (e.g., after authorization)
+- Clear old records
 """
 
 import json
 import os
 from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, List, Optional
+import uuid
 
 
 class IncidentRegistry:
-    def __init__(self, storage_path: str = "data/incidents.json", retention_days: int = 30):
-        self.storage_path = storage_path
-        self.retention_days = retention_days
-        self.incidents = []
-        self._counter = 1
-        self._load()
-        self._clean_old_records()
+    """
+    Incident Registry stores and manages incident records.
+    """
 
-    def _load(self):
-        if os.path.exists(self.storage_path):
-            try:
-                with open(self.storage_path, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                    self.incidents = data.get("incidents", [])
-                    self._counter = data.get("counter", len(self.incidents) + 1)
-                print(f"[INCIDENT_REGISTRY] Loaded {len(self.incidents)} incidents, counter: {self._counter}")
-            except Exception as e:
-                print(f"[INCIDENT_REGISTRY] Error loading: {e}")
-                self.incidents = []
-                self._counter = 1
-        else:
-            print(f"[INCIDENT_REGISTRY] No existing file at {self.storage_path}")
-            self._counter = 1
+    def __init__(self, data_file: str = "data/incident_registry.json"):
+        self.data_file = data_file
+        self._ensure_data_file()
 
-    def _save(self):
-        try:
-            os.makedirs(os.path.dirname(self.storage_path), exist_ok=True)
-            with open(self.storage_path, "w", encoding="utf-8") as f:
-                json.dump({
-                    "incidents": self.incidents,
-                    "counter": self._counter
-                }, f, indent=2, ensure_ascii=False)
-            print(f"[INCIDENT_REGISTRY] Saved {len(self.incidents)} incidents to {self.storage_path}")
-        except Exception as e:
-            print(f"[INCIDENT_REGISTRY] ERROR saving: {e}")
+    def _ensure_data_file(self):
+        """Ensure the data file exists."""
+        os.makedirs(os.path.dirname(self.data_file), exist_ok=True)
+        if not os.path.exists(self.data_file):
+            with open(self.data_file, "w") as f:
+                json.dump([], f)
 
-    def _clean_old_records(self):
-        """Удалить записи старше retention_days."""
-        if not self.incidents:
-            return
-        
-        cutoff = datetime.now(timezone.utc) - timedelta(days=self.retention_days)
-        original_count = len(self.incidents)
-        fresh_records = []
+    def _load_data(self) -> List[Dict[str, Any]]:
+        """Load all records from the data file."""
+        with open(self.data_file, "r") as f:
+            return json.load(f)
 
-        for record in self.incidents:
-            timestamp = record.get("timestamp")
-            event_id = record.get("event_id", "UNKNOWN")
-
-            if not timestamp:
-                # Не удаляем записи без timestamp
-                print(f"[INCIDENT_REGISTRY] Record {event_id} has no timestamp — preserving")
-                fresh_records.append(record)
-                continue
-
-            try:
-                # Парсим ISO-формат с Z
-                record_time = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
-
-                # Нормализуем к UTC
-                if record_time.tzinfo is None:
-                    record_time = record_time.replace(tzinfo=timezone.utc)
-                else:
-                    record_time = record_time.astimezone(timezone.utc)
-
-                # Логируем возраст записи
-                age_days = (datetime.now(timezone.utc) - record_time).total_seconds() / 86400
-                print(f"[INCIDENT_REGISTRY] Record {event_id} age={age_days:.2f} days")
-
-                if record_time >= cutoff:
-                    fresh_records.append(record)
-
-            except (ValueError, TypeError) as e:
-                # Сохраняем проблемные записи для анализа
-                print(f"[INCIDENT_REGISTRY] Record {event_id} has invalid timestamp — preserving: {e}")
-                fresh_records.append(record)
-
-        self.incidents = fresh_records
-        
-        removed = original_count - len(self.incidents)
-        if removed > 0:
-            print(f"[INCIDENT_REGISTRY] Removed {removed} old records (>{self.retention_days} days)")
-            self._save()
-        else:
-            print(f"[INCIDENT_REGISTRY] No records removed, {len(self.incidents)} kept")
+    def _save_data(self, data: List[Dict[str, Any]]):
+        """Save records to the data file."""
+        with open(self.data_file, "w") as f:
+            json.dump(data, f, indent=2, default=str)
 
     def generate_event_id(self) -> str:
-        event_id = f"EVT-{datetime.utcnow().strftime('%Y%m%d')}-{self._counter:03d}"
-        self._counter += 1
-        self._save()
-        print(f"[INCIDENT_REGISTRY] Generated event ID: {event_id}")
-        return event_id
+        """Generate a unique event ID."""
+        return f"EVT-{datetime.now(timezone.utc).strftime('%Y%m%d')}-{uuid.uuid4().hex[:6].upper()}"
 
     def add_incident(self, incident_data: Dict[str, Any]) -> str:
-        event_id = incident_data.get("event_id") or self.generate_event_id()
-        print(f"[INCIDENT_REGISTRY] Adding incident: {event_id}")
+        """Add a new incident record."""
+        data = self._load_data()
         
-        incident = {
-            "event_id": event_id,
-            "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
-            "description": incident_data.get("description", ""),
-            "event_type": incident_data.get("event_type", "UNKNOWN"),
-            "severity": incident_data.get("severity", "UNKNOWN"),
-            "critical_conditions": incident_data.get("critical_conditions", []),
-            "risk_assessment": incident_data.get("risk_assessment", {}),
-            "decision_proposal": incident_data.get("decision_proposal", {}),
-            "authorized": incident_data.get("authorized", False),
-            "status": incident_data.get("status", "COMPLETED"),
-            "record": incident_data.get("record", {})
-        }
+        # Ensure event_id exists
+        if "event_id" not in incident_data:
+            incident_data["event_id"] = self.generate_event_id()
         
-        self.incidents.append(incident)
-        self._save()
-        print(f"[INCIDENT_REGISTRY] Total incidents: {len(self.incidents)}")
-        return event_id
+        # Add timestamp if not present
+        if "timestamp" not in incident_data:
+            incident_data["timestamp"] = datetime.now(timezone.utc).isoformat()
+        
+        # Set default status if not present
+        if "status" not in incident_data:
+            incident_data["status"] = "RECEIVED"
+        
+        data.append(incident_data)
+        self._save_data(data)
+        return incident_data["event_id"]
 
-    def get_all_incidents(self) -> List[Dict[str, Any]]:
-        print(f"[INCIDENT_REGISTRY] Returning {len(self.incidents)} incidents")
-        return self.incidents
+    def update_incident(self, event_id: str, updates: Dict[str, Any]) -> bool:
+        """
+        Update an existing incident record by event_id.
+        
+        Args:
+            event_id: The ID of the incident to update.
+            updates: Dictionary of fields to update.
+            
+        Returns:
+            True if updated, False if not found.
+        """
+        data = self._load_data()
+        
+        for incident in data:
+            if incident.get("event_id") == event_id:
+                incident.update(updates)
+                incident["updated_at"] = datetime.now(timezone.utc).isoformat()
+                self._save_data(data)
+                return True
+        
+        return False
 
     def get_incident(self, event_id: str) -> Optional[Dict[str, Any]]:
-        for incident in self.incidents:
+        """Get a specific incident by event_id."""
+        data = self._load_data()
+        for incident in data:
             if incident.get("event_id") == event_id:
                 return incident
         return None
 
-    def get_statistics(self) -> Dict[str, Any]:
-        total = len(self.incidents)
-        by_type = {}
-        by_severity = {}
-        by_status = {}
+    def get_all_incidents(self) -> List[Dict[str, Any]]:
+        """Get all incidents."""
+        return self._load_data()
 
-        for incident in self.incidents:
+    def get_statistics(self) -> Dict[str, Any]:
+        """Get statistics about incidents."""
+        data = self._load_data()
+        
+        stats = {
+            "total": len(data),
+            "by_type": {},
+            "by_severity": {},
+            "by_status": {},
+        }
+        
+        for incident in data:
             event_type = incident.get("event_type", "UNKNOWN")
             severity = incident.get("severity", "UNKNOWN")
             status = incident.get("status", "UNKNOWN")
-
-            by_type[event_type] = by_type.get(event_type, 0) + 1
-            by_severity[severity] = by_severity.get(severity, 0) + 1
-            by_status[status] = by_status.get(status, 0) + 1
-
-        return {
-            "total": total,
-            "by_type": by_type,
-            "by_severity": by_severity,
-            "by_status": by_status
-        }
-
-    def get_next_event_id(self) -> str:
-        return f"EVT-{datetime.utcnow().strftime('%Y%m%d')}-{self._counter:03d}"
-
-    def clear_old_records(self, days: int = None) -> int:
-        if days is None:
-            days = self.retention_days
+            
+            stats["by_type"][event_type] = stats["by_type"].get(event_type, 0) + 1
+            stats["by_severity"][severity] = stats["by_severity"].get(severity, 0) + 1
+            stats["by_status"][status] = stats["by_status"].get(status, 0) + 1
         
+        return stats
+
+    def clear_old_records(self, days: int = 30) -> int:
+        """Clear records older than specified days."""
+        data = self._load_data()
         cutoff = datetime.now(timezone.utc) - timedelta(days=days)
-        original_count = len(self.incidents)
-        fresh_records = []
-
-        for record in self.incidents:
-            timestamp = record.get("timestamp")
-            if not timestamp:
-                fresh_records.append(record)
-                continue
-
-            try:
-                record_time = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
-                if record_time.tzinfo is None:
-                    record_time = record_time.replace(tzinfo=timezone.utc)
-                else:
-                    record_time = record_time.astimezone(timezone.utc)
-
-                if record_time >= cutoff:
-                    fresh_records.append(record)
-            except (ValueError, TypeError):
-                fresh_records.append(record)
-
-        self.incidents = fresh_records
         
-        removed = original_count - len(self.incidents)
-        self._save()
-        return removed
+        new_data = []
+        removed_count = 0
+        
+        for incident in data:
+            timestamp = incident.get("timestamp")
+            if timestamp:
+                try:
+                    dt = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
+                    if dt > cutoff:
+                        new_data.append(incident)
+                    else:
+                        removed_count += 1
+                except:
+                    new_data.append(incident)
+            else:
+                new_data.append(incident)
+        
+        self._save_data(new_data)
+        return removed_count
 
     def clear_all(self) -> int:
-        count = len(self.incidents)
-        self.incidents = []
-        self._save()
+        """Clear all records."""
+        data = self._load_data()
+        count = len(data)
+        self._save_data([])
         return count
