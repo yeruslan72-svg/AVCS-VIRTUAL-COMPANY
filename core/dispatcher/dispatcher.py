@@ -60,7 +60,7 @@ class Dispatcher:
 
         # Determine which Departments are needed
         required_departments = self._determine_required_departments(classification, input_data)
-        self._log(f"Required Departments: {[d for d in required_departments]}")
+        self._log(f"Required Departments: {[d.department_name for d in required_departments]}")
 
         # Create task packets for each Department
         task_packets = self._create_task_packets(required_departments, input_data)
@@ -103,7 +103,11 @@ class Dispatcher:
         return "GENERAL"
 
     def _determine_required_departments(self, classification: str, input_data: Dict[str, Any]) -> List:
-        """Determine which Departments are needed for this event."""
+        """
+        Determine which Departments are needed for this event.
+        
+        Now includes NAVIGATOR, COMPASS, and HELM for all event types.
+        """
         required = []
         
         # Always include LOOKOUT for any event
@@ -117,26 +121,53 @@ class Dispatcher:
                 if dept.department_name != "LOOKOUT Dpt.":
                     required.append(dept)
         
-        # For environmental, include CHARTS and GYRO
+        # For environmental, include CHARTS, GYRO, NAVIGATOR, COMPASS, HELM
         elif classification == "ENVIRONMENTAL":
             charts = self._find_department("CHARTS Dpt.")
             gyro = self._find_department("GYRO Dpt.")
-            if charts:
-                required.append(charts)
-            if gyro:
-                required.append(gyro)
-        
-        # For anomaly, include LOOKOUT, CHARTS, GYRO, NAVIGATOR
-        elif classification == "ANOMALY":
-            charts = self._find_department("CHARTS Dpt.")
-            gyro = self._find_department("GYRO Dpt.")
             navigator = self._find_department("NAVIGATOR Dpt.")
+            compass = self._find_department("COMPASS Dpt.")
+            helm = self._find_department("HELM Dpt.")
             if charts:
                 required.append(charts)
             if gyro:
                 required.append(gyro)
             if navigator:
                 required.append(navigator)
+            if compass:
+                required.append(compass)
+            if helm:
+                required.append(helm)
+        
+        # For anomaly, include LOOKOUT, CHARTS, GYRO, NAVIGATOR, COMPASS, HELM
+        elif classification == "ANOMALY":
+            charts = self._find_department("CHARTS Dpt.")
+            gyro = self._find_department("GYRO Dpt.")
+            navigator = self._find_department("NAVIGATOR Dpt.")
+            compass = self._find_department("COMPASS Dpt.")
+            helm = self._find_department("HELM Dpt.")
+            if charts:
+                required.append(charts)
+            if gyro:
+                required.append(gyro)
+            if navigator:
+                required.append(navigator)
+            if compass:
+                required.append(compass)
+            if helm:
+                required.append(helm)
+
+        # For GENERAL, include NAVIGATOR, COMPASS, HELM
+        elif classification == "GENERAL":
+            navigator = self._find_department("NAVIGATOR Dpt.")
+            compass = self._find_department("COMPASS Dpt.")
+            helm = self._find_department("HELM Dpt.")
+            if navigator:
+                required.append(navigator)
+            if compass:
+                required.append(compass)
+            if helm:
+                required.append(helm)
 
         # Always include CAPTAIN for decision
         captain = self._find_department("CAPTAIN Dpt.")
