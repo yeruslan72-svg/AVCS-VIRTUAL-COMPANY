@@ -986,4 +986,7 @@ with tab5:
     
     col1, col2 = st.columns(2)
     with col1:
-        if
+        if st.button("🗑️ Clear Old Records (>30 days)"):
+            removed = registry.clear_old_records(30)
+            if removed > 0:
+               
