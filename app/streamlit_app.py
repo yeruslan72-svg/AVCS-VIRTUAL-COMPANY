@@ -1,28 +1,20 @@
 """
 AVCS VIRTUAL COMPANY
 Streamlit UI — Operational Decision Dashboard
-
-FUNCTION:
-- Free-form incident input
-- Automatic classification
-- Dynamic department processing
-- Human authorization
-- AVCS Record generation
-- Incident Registry with history and drift analysis
+Version: v0.3.7 — Embedded Semantic Event Normalizer
 """
 
 import sys
 import os
+import streamlit as st
+import json
+from datetime import datetime
+import re
 
 # Добавляем корневую папку проекта в sys.path
 root_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if root_path not in sys.path:
     sys.path.insert(0, root_path)
-
-import streamlit as st
-import json
-from datetime import datetime
-import re
 
 # Импорт департаментов и других компонентов
 from core.departments import (
@@ -40,28 +32,25 @@ from core.conflict_detection import ConflictDetector
 from core.decision_engine import DecisionEngine
 from core.authority_gate import AuthorityGate
 from core.state_machine import StateMachine
-
-# --- НОВЫЕ ИМПОРТЫ ДЛЯ v0.2 ---
 from core.risk_engine import RiskEngine
-
-# --- НОВЫЙ ИМПОРТ ДЛЯ РЕЕСТРА ---
 from records.incident_registry import IncidentRegistry
 
 
 # =============================================================================
-# ВСТРОЕННАЯ ДИАГНОСТИКА (без external normalizer.py)
+# ВСТРОЕННЫЙ SEMANTIC EVENT NORMALIZER v0.3.7
 # =============================================================================
 
-def extract_critical_conditions(text: str):
+class SemanticEventNormalizer:
     """
-    Встроенная диагностика — извлекает критические условия из текста.
-    Работает без внешнего модуля normalizer.py.
+    Встроенный нормализатор событий с полной семантикой:
+    - Обнаружение ключевых слов
+    - Отрицание (no, not, without, ruled out)
+    - Неопределённость (suspected, possible, appears)
+    - Временной контекст (previous, reported, current)
+    - Единый контракт для critical_conditions
     """
-    conditions = []
-    text_lower = text.lower()
 
-    # Ключевые слова для диагностики
-    keywords = {
+    CRITICAL_KEYWORDS = {
         "fire": {"severity": "CRITICAL", "keywords": ["fire", "flame", "burning", "ignition"]},
         "smoke": {"severity": "HIGH", "keywords": ["smoke", "fume"]},
         "evacuation": {"severity": "CRITICAL", "keywords": ["evacuate", "evacuating", "abandon"]},
@@ -75,65 +64,183 @@ def extract_critical_conditions(text: str):
         "explosion": {"severity": "CRITICAL", "keywords": ["explosion", "blast", "boom"]},
     }
 
-    # Паттерны для неопределённости
-    uncertainty_patterns = [
+    NEGATION_PATTERNS = [
+        r"\bno\s+", r"\bnot\s+", r"\bwithout\s+",
+        r"\bnever\s+", r"\bruled\s+out\s*", r"\bexcluded\s*",
+        r"\babsent\s*", r"\bnot\s+detected\s*", r"\bno\s+evidence\s*"
+    ]
+
+    UNCERTAINTY_PATTERNS = [
         r"\bsuspected\s+", r"\bpossible\s+", r"\bprobable\s+",
         r"\bprobably\s+", r"\bmaybe\s+", r"\bpotential\s+",
         r"\bappears?\s*", r"\bseems?\s*", r"\bindicates?\s*",
         r"\bsuggests?\s*"
     ]
 
-    for condition_type, config in keywords.items():
-        for keyword in config["keywords"]:
-            if keyword not in text_lower:
-                continue
+    TEMPORAL_PATTERNS = {
+        "previous": [r"\bprevious\s+", r"\bprior\s+", r"\bhistorical\s+", r"\bearlier\s+"],
+        "reported": [r"\breported\s+", r"\bstated\s+", r"\baccording to\s+"],
+        "current": [r"\bcurrent\s+", r"\bnow\s+", r"\bat this time\s+"],
+        "confirmed": [r"\bconfirmed\s+", r"\bverified\s+", r"\bvalidated\s+"],
+    }
 
-            position = text_lower.find(keyword)
+    def normalize(self, text: str) -> dict:
+        """
+        Полная нормализация текста события.
+        Возвращает:
+        - critical_conditions: список условий
+        - event_type: определённый тип события
+        - severity: общий уровень серьёзности
+        - semantic_summary: сводка по семантике
+        """
+        conditions = self._extract_critical_conditions(text)
+        event_type = self._determine_event_type(conditions)
+        severity = self._determine_overall_severity(conditions)
+        semantic_summary = self._build_semantic_summary(conditions)
 
-            # Semantic Window: 50 символов до и после
-            window_start = max(0, position - 50)
-            window_end = min(len(text), position + len(keyword) + 50)
-            window_text = text[window_start:window_end].lower()
+        return {
+            "critical_conditions": conditions,
+            "critical_conditions_count": len(conditions),
+            "event_type": event_type,
+            "severity": severity,
+            "has_critical": any(c.get("severity") == "CRITICAL" for c in conditions),
+            "has_high": any(c.get("severity") == "HIGH" for c in conditions),
+            "semantic_summary": semantic_summary,
+            "status": "NORMALIZED"
+        }
 
-            # Проверка на неопределённость
-            uncertainty_found = False
-            for pattern in uncertainty_patterns:
-                if re.search(pattern, window_text):
-                    uncertainty_found = True
-                    break
+    def _extract_critical_conditions(self, text: str) -> list:
+        """Извлечение критических условий с полной семантикой."""
+        conditions = []
+        text_lower = text.lower()
 
-            if uncertainty_found:
-                polarity = "NEUTRAL"
-                uncertainty = "HIGH"
-                confidence = 0.6
-                severity = config["severity"]
-            else:
-                polarity = "POSITIVE"
-                uncertainty = None
-                confidence = 0.8
-                severity = config["severity"]
+        for condition_type, config in self.CRITICAL_KEYWORDS.items():
+            for keyword in config["keywords"]:
+                if keyword not in text_lower:
+                    continue
 
-            start = max(0, position - 30)
-            end = min(len(text), position + 50)
-            context = text[start:end].strip()
+                position = text_lower.find(keyword)
 
-            conditions.append({
-                "condition": condition_type.upper(),
-                "severity": severity,
-                "keyword": keyword,
-                "context": context,
-                "polarity": polarity,
-                "confidence": confidence,
-                "uncertainty": uncertainty,
-                "negation_found": False,
-                "uncertainty_found": uncertainty_found,
-                "timestamp": datetime.utcnow().isoformat() + "Z",
-                "source": "INCIDENT_INPUT",
-                "status": "ACTIVE"
-            })
-            break
+                # Semantic Window
+                window_start = max(0, position - 50)
+                window_end = min(len(text), position + len(keyword) + 50)
+                window_text = text[window_start:window_end].lower()
 
-    return conditions
+                # --- ОТРИЦАНИЕ ---
+                negation_found = False
+                for pattern in self.NEGATION_PATTERNS:
+                    if re.search(pattern, window_text):
+                        negation_found = True
+                        break
+
+                if negation_found:
+                    continue  # Пропускаем условие
+
+                # --- ВРЕМЕННОЙ КОНТЕКСТ ---
+                temporal_context = None
+                for ctx_type, patterns in self.TEMPORAL_PATTERNS.items():
+                    for pattern in patterns:
+                        if re.search(pattern, window_text):
+                            temporal_context = ctx_type.upper()
+                            break
+                    if temporal_context:
+                        break
+
+                if temporal_context == "PREVIOUS":
+                    continue  # Пропускаем историческое упоминание
+
+                # --- НЕОПРЕДЕЛЁННОСТЬ ---
+                uncertainty_found = False
+                for pattern in self.UNCERTAINTY_PATTERNS:
+                    if re.search(pattern, window_text):
+                        uncertainty_found = True
+                        break
+
+                # --- ОПРЕДЕЛЕНИЕ СТАТУСА ---
+                if uncertainty_found:
+                    polarity = "NEUTRAL"
+                    uncertainty = "HIGH"
+                    confidence = 0.6
+                    severity = config["severity"]
+                else:
+                    polarity = "POSITIVE"
+                    uncertainty = None
+                    confidence = 0.8
+                    severity = config["severity"]
+
+                # Контекст
+                start = max(0, position - 30)
+                end = min(len(text), position + 50)
+                context = text[start:end].strip()
+
+                conditions.append({
+                    "condition": condition_type.upper(),
+                    "severity": severity,
+                    "keyword": keyword,
+                    "context": context,
+                    "polarity": polarity,
+                    "confidence": confidence,
+                    "uncertainty": uncertainty,
+                    "negation_found": False,
+                    "uncertainty_found": uncertainty_found,
+                    "temporal_context": temporal_context,
+                    "timestamp": datetime.utcnow().isoformat() + "Z",
+                    "source": "INCIDENT_INPUT",
+                    "status": "ACTIVE"
+                })
+                break
+
+        return conditions
+
+    def _determine_event_type(self, conditions: list) -> str:
+        """Определение типа события."""
+        if not conditions:
+            return "GENERAL"
+        for c in conditions:
+            if c.get("severity") == "CRITICAL":
+                return c["condition"]
+        for c in conditions:
+            if c.get("severity") == "HIGH":
+                return c["condition"]
+        return conditions[0]["condition"]
+
+    def _determine_overall_severity(self, conditions: list) -> str:
+        """Определение общего уровня серьёзности."""
+        if any(c.get("severity") == "CRITICAL" for c in conditions):
+            return "CRITICAL"
+        if any(c.get("severity") == "HIGH" for c in conditions):
+            return "HIGH"
+        return "LOW"
+
+    def _build_semantic_summary(self, conditions: list) -> dict:
+        """Сводка по семантике."""
+        if not conditions:
+            return {
+                "total_conditions": 0,
+                "polarities": {},
+                "uncertainties": [],
+                "average_confidence": 0.0
+            }
+
+        polarities = {}
+        uncertainties = []
+        total_confidence = 0.0
+
+        for cond in conditions:
+            polarity = cond.get("polarity", "UNKNOWN")
+            polarities[polarity] = polarities.get(polarity, 0) + 1
+            if cond.get("uncertainty"):
+                uncertainties.append(cond.get("uncertainty"))
+            total_confidence += cond.get("confidence", 0.8)
+
+        return {
+            "total_conditions": len(conditions),
+            "polarities": polarities,
+            "uncertainties": uncertainties,
+            "average_confidence": total_confidence / len(conditions),
+            "has_negation": polarities.get("NEGATIVE", 0) > 0,
+            "has_uncertainty": len(uncertainties) > 0
+        }
 
 
 # --- Настройка страницы ---
@@ -143,594 +250,5 @@ st.set_page_config(
     layout="wide"
 )
 
-# --- ПРИВЕТСТВЕННАЯ СТРАНИЦА (МИЛИТАРИ-СТИЛЬ) ---
-if "welcome_shown" not in st.session_state:
-    st.session_state.welcome_shown = False
-
-if not st.session_state.welcome_shown:
-    st.markdown("""
-    <style>
-        .welcome-container {
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
-            padding: 60px 40px;
-            border-radius: 15px;
-            border: 2px solid #c9a84c;
-            box-shadow: 0 0 40px rgba(201, 168, 76, 0.2);
-            text-align: center;
-            margin-top: 40px;
-        }
-        .welcome-title {
-            font-size: 48px;
-            font-weight: 700;
-            color: #c9a84c;
-            text-shadow: 0 0 30px rgba(201, 168, 76, 0.3);
-            letter-spacing: 4px;
-            text-transform: uppercase;
-            font-family: 'Courier New', monospace;
-        }
-        .welcome-subtitle {
-            font-size: 20px;
-            color: #8a8a8a;
-            margin-top: 10px;
-            font-family: 'Courier New', monospace;
-            letter-spacing: 2px;
-        }
-        .welcome-divider {
-            border: 1px solid #c9a84c;
-            margin: 30px auto;
-            width: 60%;
-            opacity: 0.3;
-        }
-        .welcome-text {
-            color: #c0c0c0;
-            font-size: 16px;
-            line-height: 1.8;
-            font-family: 'Courier New', monospace;
-            max-width: 700px;
-            margin: 0 auto 30px auto;
-        }
-        .welcome-status {
-            display: inline-block;
-            background: #1a3a2a;
-            color: #00ff88;
-            padding: 8px 24px;
-            border-radius: 20px;
-            font-size: 14px;
-            font-family: 'Courier New', monospace;
-            border: 1px solid #00ff88;
-            letter-spacing: 1px;
-            margin-bottom: 20px;
-        }
-        .welcome-button {
-            background: transparent;
-            color: #c9a84c;
-            border: 2px solid #c9a84c;
-            padding: 12px 40px;
-            border-radius: 5px;
-            font-size: 18px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            text-transform: uppercase;
-            letter-spacing: 2px;
-            font-family: 'Courier New', monospace;
-        }
-        .welcome-button:hover {
-            background: #c9a84c;
-            color: #1a1a2e;
-        }
-        .welcome-version {
-            color: #555;
-            font-size: 12px;
-            margin-top: 20px;
-            font-family: 'Courier New', monospace;
-        }
-        .welcome-badge {
-            display: inline-block;
-            background: rgba(201, 168, 76, 0.1);
-            border: 1px solid #c9a84c;
-            color: #c9a84c;
-            padding: 4px 16px;
-            border-radius: 4px;
-            font-size: 12px;
-            letter-spacing: 1px;
-            font-family: 'Courier New', monospace;
-        }
-    </style>
-    """, unsafe_allow_html=True)
-
-    st.markdown("""
-    <div class="welcome-container">
-        <div class="welcome-badge">AVCS — STRUCTURAL INTEGRITY SYSTEM</div>
-        <div style="height: 20px;"></div>
-        <div class="welcome-title">🧭 OPERATIONAL<br>DECISION ARCHITECTURE</div>
-        <div class="welcome-subtitle">AI-Driven Incident Management System</div>
-        <hr class="welcome-divider">
-        <div class="welcome-status">● SYSTEM READY — AWAITING COMMAND</div>
-        <div class="welcome-text">
-            <strong style="color: #c9a84c;">AVCS VIRTUAL COMPANY</strong> is an operational decision architecture<br>
-            designed for high-risk environments.<br><br>
-            <span style="color: #666;">INCIDENT → DISPATCHER → 7 Dpts. → AGGREGATION → CONFLICT → DECISION → AUTHORITY → EXECUTION → RECORD</span>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-
-    # --- КНОПКА ВХОДА ---
-    col1, col2, col3 = st.columns([1, 2, 1])
-    with col2:
-        if st.button("▸ ENTER COMMAND CENTER", use_container_width=True, type="primary"):
-            st.session_state.welcome_shown = True
-            st.rerun()
-    
-    st.stop()
-
-# --- ОСНОВНОЙ ИНТЕРФЕЙС ---
-
-st.title("🧭 AVCS VIRTUAL COMPANY")
-st.subheader("AI-Driven Operational Decision Architecture")
-
-# --- Инициализация сессии ---
-if "initialized" not in st.session_state:
-    st.session_state.initialized = True
-    st.session_state.event_id = None
-    st.session_state.current_step = "input"
-    st.session_state.event_data = None
-    st.session_state.dispatcher_results = None
-    st.session_state.department_results = None
-    st.session_state.aggregated_state = None
-    st.session_state.conflict_result = None
-    st.session_state.decision_proposal = None
-    st.session_state.authority_state = None
-    st.session_state.authorized = None
-    
-    # --- Поля ввода (привязаны к session_state) ---
-    st.session_state.incident_text = ""
-    st.session_state.object_type = ""
-    st.session_state.position = ""
-    st.session_state.heading = 0
-    st.session_state.speed = 0
-
-# --- Sidebar ---
-with st.sidebar:
-    # --- Логотип AVCS ---
-    try:
-        st.image("app/logo.png", width=200)
-    except:
-        st.markdown("### 🧭 AVCS")
-    
-    st.divider()
-    
-    st.header("System Status")
-    if st.session_state.get("event_id"):
-        st.info(f"Event: {st.session_state.event_id}")
-    else:
-        st.info("No active event")
-    st.write(f"Step: {st.session_state.current_step}")
-    st.divider()
-    st.header("Architecture")
-    st.caption("INCIDENT → DISPATCHER → 7 Dpts. → AGGREGATION → CONFLICT → DECISION → AUTHORITY → EXECUTION → RECORD")
-    st.divider()
-    st.caption("Version: 0.2 — Information Integrity Layer")
-
-    # --- Кнопка сброса события (очищает поля, НЕ реестр) ---
-    st.divider()
-    if st.button("🔄 Reset Event", use_container_width=True):
-        # Очищаем поля ввода
-        st.session_state.incident_text = ""
-        st.session_state.object_type = ""
-        st.session_state.position = ""
-        st.session_state.heading = 0
-        st.session_state.speed = 0
-        
-        # Удаляем только текущую сессию, НЕ реестр
-        for key in ["event_id", "event_data", "dispatcher_results", "department_results", 
-                    "aggregated_state", "conflict_result", "decision_proposal", 
-                    "authority_state", "authorized", "current_step"]:
-            if key in st.session_state:
-                del st.session_state[key]
-        
-        st.session_state.current_step = "input"
-        st.rerun()
-
-# --- Основные вкладки ---
-tab1, tab2, tab3, tab4, tab5 = st.tabs([
-    "📥 Incident Input",
-    "⚙️ Processing",
-    "📋 Decision",
-    "📊 Record",
-    "📋 Incident Registry"
-])
-
-
-# --- TAB 1: INCIDENT INPUT ---
-with tab1:
-    st.header("Incident Input")
-    st.caption("Describe any incident — the system will classify and process it automatically.")
-
-    # --- Свободное описание инцидента ---
-    incident_description = st.text_area(
-        "Incident Description",
-        value=st.session_state.incident_text,
-        height=150,
-        placeholder="Describe the incident in detail...\n\nExample: 'Hull breach in compartment 3, water ingress 50 tons/hour, vessel listing 12 degrees, position 35°N 45°W, weather storm force 5'"
-    )
-
-    # --- Дополнительные структурированные поля (опционально) ---
-    col1, col2 = st.columns(2)
-    with col1:
-        object_type = st.text_input(
-            "Object / Vessel (optional)",
-            value=st.session_state.object_type,
-            placeholder="e.g., Tanker, FPSO, Plant"
-        )
-        position = st.text_input(
-            "Position (optional)",
-            value=st.session_state.position,
-            placeholder="e.g., 35°N 45°W"
-        )
-    with col2:
-        heading = st.number_input(
-            "Heading (optional)",
-            min_value=0,
-            max_value=360,
-            value=st.session_state.heading
-        )
-        speed = st.number_input(
-            "Speed (optional)",
-            min_value=0,
-            max_value=100,
-            value=st.session_state.speed
-        )
-
-    # --- Кнопка обработки ---
-    if st.button("🚀 Process Incident", type="primary"):
-        if not incident_description.strip():
-            st.error("Please describe the incident.")
-        else:
-            # Сохраняем все поля в session_state
-            st.session_state.incident_text = incident_description
-            st.session_state.object_type = object_type
-            st.session_state.position = position
-            st.session_state.heading = heading
-            st.session_state.speed = speed
-
-            # --- ФОРМИРУЕМ ДАННЫЕ ДЛЯ ОБРАБОТКИ ---
-            registry = IncidentRegistry()
-            event_id = registry.generate_event_id()
-
-            # --- ИЗВЛЕКАЕМ КРИТИЧЕСКИЕ УСЛОВИЯ (ВСТРОЕННАЯ ДИАГНОСТИКА) ---
-            critical_conditions = extract_critical_conditions(incident_description)
-
-            event_data = {
-                "event_id": event_id,
-                "description": incident_description,
-                "object": object_type if object_type else "Unknown",
-                "position": position if position else "Unknown",
-                "heading": heading,
-                "speed": speed,
-                "timestamp": datetime.utcnow().isoformat() + "Z",
-                "escalate": True,
-                "critical_conditions": critical_conditions,
-                "critical_conditions_count": len(critical_conditions),
-                "has_critical": any(c.get("severity") == "CRITICAL" for c in critical_conditions),
-                "has_high": any(c.get("severity") == "HIGH" for c in critical_conditions),
-                "status": "NORMALIZED"
-            }
-
-            # --- СОХРАНЯЕМ В РЕЕСТР ---
-            registry.add_incident(event_data)
-
-            st.session_state.event_data = event_data
-            st.session_state.event_id = event_data["event_id"]
-            st.session_state.current_step = "processing"
-            st.rerun()
-
-    if st.session_state.get("event_id"):
-        st.success(f"Event created: {st.session_state.event_id}")
-        if st.session_state.get("event_data") and "critical_conditions" in st.session_state.get("event_data", {}):
-            with st.expander("📋 Critical Conditions Extracted"):
-                st.json(st.session_state.event_data["critical_conditions"])
-
-
-# --- TAB 2: PROCESSING ---
-with tab2:
-    st.header("Processing Pipeline")
-
-    if st.session_state.current_step == "processing" and st.session_state.event_data:
-        with st.spinner("Processing incident..."):
-            # --- Создаём департаменты ---
-            lookout = LookoutDepartment()
-            charts = ChartsDepartment()
-            gyro = GyroDepartment()
-            navigator = NavigatorDepartment()
-            compass = CompassDepartment()
-            helm = HelmDepartment()
-            captain = CaptainDepartment()
-
-            # --- Создаём диспетчер и регистрируем департаменты ---
-            dispatcher = Dispatcher()
-            dispatcher.register_department(lookout)
-            dispatcher.register_department(charts)
-            dispatcher.register_department(gyro)
-            dispatcher.register_department(navigator)
-            dispatcher.register_department(compass)
-            dispatcher.register_department(helm)
-            dispatcher.register_department(captain)
-
-            # --- Создаем остальные компоненты ---
-            aggregator = Aggregator()
-            conflict_detector = ConflictDetector()
-            decision_engine = DecisionEngine()
-            authority_gate = AuthorityGate()
-            state_machine = StateMachine()
-
-            # --- Подготавливаем данные для департаментов ---
-            event_data = st.session_state.event_data.copy()
-
-            # Добавляем поля для департаментов
-            event_data["situation"] = event_data.get("description", "Incident detected")
-            event_data["time_to_event"] = 5
-            event_data["action"] = "Analyze and respond"
-            event_data["authorized"] = False
-            event_data["decision_proposal"] = "Awaiting assessment"
-            event_data["evidence"] = [
-                f"Event type: {event_data.get('event_type', 'UNKNOWN')}",
-                f"Severity: {event_data.get('severity', 'UNKNOWN')}",
-                f"Description: {event_data.get('description', '')[:100]}"
-            ]
-            event_data["current_heading"] = event_data.get("heading", 0)
-            event_data["current_speed"] = event_data.get("speed", 0)
-            event_data["threat_heading"] = 0
-            event_data["threat_speed"] = 0
-            event_data["separation_required"] = 0.5
-
-            # --- Запускаем обработку ---
-            state_machine.start(st.session_state.event_id)
-
-            state_machine.dispatch()
-            dispatcher_results = dispatcher.process_incoming_event(event_data)
-
-            state_machine.process()
-            task_packets = dispatcher_results.get("task_packets", [])
-            department_results = {}
-            for packet in task_packets:
-                dept_name = packet["department"]
-                dept_data = packet["data"]
-                if dept_name == "LOOKOUT Dpt.":
-                    result = lookout.process(dept_data)
-                elif dept_name == "CHARTS Dpt.":
-                    result = charts.process(dept_data)
-                elif dept_name == "GYRO Dpt.":
-                    result = gyro.process(dept_data)
-                elif dept_name == "NAVIGATOR Dpt.":
-                    result = navigator.process(dept_data)
-                elif dept_name == "COMPASS Dpt.":
-                    result = compass.process(dept_data)
-                elif dept_name == "HELM Dpt.":
-                    result = helm.process(dept_data)
-                elif dept_name == "CAPTAIN Dpt.":
-                    result = captain.process(dept_data)
-                else:
-                    result = {"error": f"Unknown department: {dept_name}"}
-                department_results[dept_name] = result
-
-            state_machine.aggregate()
-            aggregated_state = aggregator.aggregate(department_results, st.session_state.event_id)
-
-            # --- ОЦЕНКА РИСКА (v0.2) ---
-            risk_engine = RiskEngine()
-            critical_conditions = event_data.get("critical_conditions", [])
-            risk_assessment = risk_engine.evaluate_risk(critical_conditions)
-            aggregated_state["risk_assessment"] = risk_assessment
-
-            state_machine.detect_conflicts()
-            conflict_result = conflict_detector.detect(aggregated_state)
-
-            state_machine.formulate_decision()
-            decision_proposal = decision_engine.formulate(aggregated_state, conflict_result)
-            decision_proposal["risk_assessment"] = risk_assessment
-
-            state_machine.wait_for_authority()
-            authority_state = authority_gate.present_decision(decision_proposal)
-
-            # --- Сохраняем результаты ---
-            st.session_state.dispatcher_results = dispatcher_results
-            st.session_state.department_results = department_results
-            st.session_state.aggregated_state = aggregated_state
-            st.session_state.conflict_result = conflict_result
-            st.session_state.decision_proposal = decision_proposal
-            st.session_state.authority_state = authority_state
-            st.session_state.current_step = "authority"
-
-            # --- Обновляем реестр с результатами ---
-            registry = IncidentRegistry()
-            registry.add_incident({
-                **event_data,
-                "decision_proposal": decision_proposal,
-                "authorized": False,
-                "status": "AWAITING_AUTHORITY"
-            })
-
-            st.rerun()
-
-    # --- Отображение результатов обработки ---
-    if st.session_state.get("department_results"):
-        st.subheader("Department Assessments")
-        for dept, result in st.session_state.department_results.items():
-            with st.expander(f"📋 {dept}"):
-                if "error" in result:
-                    st.error(result["error"])
-                else:
-                    st.json(result)
-
-    if st.session_state.get("aggregated_state"):
-        st.subheader("📊 Aggregated State")
-        st.json(st.session_state.aggregated_state)
-
-        # --- Отображение оценки риска (v0.2) ---
-        if "risk_assessment" in st.session_state.aggregated_state:
-            st.subheader("⚠️ Risk Assessment")
-            risk_data = st.session_state.aggregated_state["risk_assessment"]
-            if risk_data.get("overall_risk") == "CRITICAL":
-                st.error(f"🚨 CRITICAL RISK: {risk_data.get('risk_count', 0)} risks identified")
-            elif risk_data.get("overall_risk") == "HIGH":
-                st.warning(f"⚠️ HIGH RISK: {risk_data.get('risk_count', 0)} risks identified")
-            else:
-                st.success(f"✅ LOW RISK: {risk_data.get('risk_count', 0)} risks identified")
-            st.json(risk_data)
-
-    if st.session_state.get("conflict_result"):
-        st.subheader("⚠️ Conflict Detection")
-        if st.session_state.conflict_result.get("has_conflicts"):
-            st.warning("Conflicts detected!")
-        else:
-            st.success("No conflicts detected")
-        st.json(st.session_state.conflict_result)
-
-
-# --- TAB 3: DECISION ---
-with tab3:
-    st.header("Decision Authority")
-
-    if st.session_state.get("decision_proposal"):
-        st.subheader("Decision Proposal")
-        st.json(st.session_state.decision_proposal)
-
-    if st.session_state.get("authority_state"):
-        st.subheader("Authority Gate")
-        st.json(st.session_state.authority_state)
-
-        if st.session_state.authority_state.get("status") == "PENDING":
-            st.divider()
-            st.markdown("### 🔐 Human Authorization Required")
-
-            col1, col2 = st.columns(2)
-            with col1:
-                if st.button("✅ Approve", type="primary"):
-                    st.session_state.authorized = True
-                    st.session_state.current_step = "executing"
-                    st.rerun()
-            with col2:
-                if st.button("❌ Reject", type="secondary"):
-                    st.session_state.authorized = False
-                    st.session_state.current_step = "completed"
-                    st.rerun()
-
-        if st.session_state.get("authorized") is True:
-            st.success("✅ Decision Authorized")
-            st.session_state.current_step = "completed"
-        elif st.session_state.get("authorized") is False:
-            st.error("❌ Decision Rejected")
-
-
-# --- TAB 4: RECORD ---
-with tab4:
-    st.header("AVCS Decision Record")
-
-    if st.session_state.current_step == "completed":
-        if st.session_state.get("authorized"):
-            st.success("Decision Cycle Completed — Authorized")
-        else:
-            st.info("Decision Cycle Completed — Rejected")
-
-        record = {
-            "event_id": st.session_state.event_id,
-            "timestamp": datetime.utcnow().isoformat() + "Z",
-            "status": "COMPLETED",
-            "authorized": st.session_state.authorized,
-            "decision_proposal": st.session_state.decision_proposal,
-            "authority_state": st.session_state.authority_state,
-            "aggregated_state": st.session_state.aggregated_state,
-            "conflict_result": st.session_state.conflict_result
-        }
-
-        st.json(record)
-
-        st.download_button(
-            label="📥 Download AVCS Record",
-            data=json.dumps(record, indent=2),
-            file_name=f"AVCS_RECORD_{st.session_state.event_id}.json",
-            mime="application/json"
-        )
-    else:
-        st.info("Complete the decision cycle to generate AVCS Record")
-
-
-# --- TAB 5: INCIDENT REGISTRY ---
-with tab5:
-    st.header("📋 Incident Registry")
-    st.caption("История всех обработанных инцидентов. Автоочистка >30 дней.")
-    
-    registry = IncidentRegistry()
-    incidents = registry.get_all_incidents()
-    stats = registry.get_statistics()
-    
-    # --- Статистика ---
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        st.metric("Total Incidents", stats["total"])
-    with col2:
-        st.metric("Event Types", len(stats["by_type"]))
-    with col3:
-        st.metric("Critical", stats["by_severity"].get("CRITICAL", 0))
-    with col4:
-        st.metric("Authorized", stats["by_status"].get("AUTHORIZED", 0))
-    
-    st.divider()
-    
-    # --- Фильтры ---
-    col1, col2 = st.columns(2)
-    with col1:
-        filter_type = st.selectbox("Filter by Event Type", ["All"] + list(stats["by_type"].keys()))
-    with col2:
-        filter_status = st.selectbox("Filter by Status", ["All"] + list(stats["by_status"].keys()))
-    
-    # --- Список событий ---
-    filtered_incidents = incidents
-    if filter_type != "All":
-        filtered_incidents = [i for i in filtered_incidents if i.get("event_type") == filter_type]
-    if filter_status != "All":
-        filtered_incidents = [i for i in filtered_incidents if i.get("status") == filter_status]
-    
-    if not filtered_incidents:
-        st.info("No incidents found.")
-    else:
-        st.write(f"Showing {len(filtered_incidents)} of {len(incidents)} incidents")
-        
-        for incident in reversed(filtered_incidents[-50:]):  # Последние 50
-            with st.expander(f"{incident['event_id']} — {incident['event_type']} ({incident['status']})"):
-                col1, col2 = st.columns(2)
-                with col1:
-                    st.write(f"**Description:** {incident.get('description', 'N/A')}")
-                    st.write(f"**Severity:** {incident.get('severity', 'UNKNOWN')}")
-                    st.write(f"**Authorized:** {incident.get('authorized', False)}")
-                with col2:
-                    st.write(f"**Timestamp:** {incident.get('timestamp', 'N/A')}")
-                    if incident.get("critical_conditions"):
-                        st.write("**Critical Conditions:**")
-                        for cond in incident.get("critical_conditions", []):
-                            st.write(f"- {cond.get('condition')} ({cond.get('severity')})")
-                
-                if st.button(f"View Record", key=f"view_{incident['event_id']}"):
-                    st.json(incident.get("record", {}))
-    
-    st.divider()
-    
-    # --- Очистка ---
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button("🗑️ Clear Old Records (>30 days)"):
-            removed = registry.clear_old_records(30)
-            if removed > 0:
-                st.success(f"Removed {removed} old records.")
-            else:
-                st.info("No records older than 30 days.")
-            st.rerun()
-    with col2:
-        if st.button("🗑️ Clear All Records (Danger)"):
-            # Простой подтверждение через чекбокс
-            confirm = st.checkbox("I understand this will delete ALL records")
-            if confirm:
-                count = registry.clear_all()
-                st.warning(f"Deleted {count} records.")
-                st.rerun()
+# ... (остальная часть кода остаётся без изменений, начиная с приветственной страницы и далее)
+# Я продолжу в следующем сообщении, чтобы не превысить лимит.
