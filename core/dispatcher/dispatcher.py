@@ -89,16 +89,29 @@ class Dispatcher:
         }
 
     def _classify_information(self, input_data: Dict[str, Any]) -> str:
-        """Classify the type of incoming information."""
+        """
+        Classify the type of incoming information.
+        
+        THREAT_DETECTION now includes: drone, uav, collision, water ingress.
+        """
+        text = str(input_data).lower()
+        
         # Check for drone detection
-        if "drone" in str(input_data).lower() or "uav" in str(input_data).lower():
+        if "drone" in text or "uav" in text:
             return "THREAT_DETECTION"
+        
+        # Check for collision or water ingress (also THREAT_DETECTION)
+        if "collision" in text or "water ingress" in text:
+            return "THREAT_DETECTION"
+        
         # Check for anomaly
-        if "anomaly" in str(input_data).lower() or "deviation" in str(input_data).lower():
+        if "anomaly" in text or "deviation" in text:
             return "ANOMALY"
+        
         # Check for environmental
-        if "position" in str(input_data).lower() or "location" in str(input_data).lower():
+        if "position" in text or "location" in text:
             return "ENVIRONMENTAL"
+        
         # Default
         return "GENERAL"
 
@@ -106,7 +119,7 @@ class Dispatcher:
         """
         Determine which Departments are needed for this event.
         
-        Now includes NAVIGATOR, COMPASS, and HELM for all event types.
+        For THREAT_DETECTION — all departments are activated.
         """
         required = []
         
@@ -139,7 +152,7 @@ class Dispatcher:
             if helm:
                 required.append(helm)
         
-        # For anomaly, include LOOKOUT, CHARTS, GYRO, NAVIGATOR, COMPASS, HELM
+        # For anomaly, include CHARTS, GYRO, NAVIGATOR, COMPASS, HELM
         elif classification == "ANOMALY":
             charts = self._find_department("CHARTS Dpt.")
             gyro = self._find_department("GYRO Dpt.")
