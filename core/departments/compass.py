@@ -1,148 +1,191 @@
 """
 AVCS VIRTUAL COMPANY
-COMPASS Dpt. — Action and Trajectory Recommendation
+COMPASS Dpt. — North Integrity / Boundary Authority
 
 CONTRACT:
-PURPOSE: Develop operational response options and calculate/recommend appropriate trajectory or action parameters
-AUTHORITY: NONE
-PROHIBITED: Authorize response, issue command, bypass CAPTAIN Dpt.
+PURPOSE: Determine whether a proposed decision remains within North.
+AUTHORITY: Boundary Authority (veto on violation of North).
+PROHIBITED: Recommend actions, calculate trajectories, issue commands, execute.
 """
 
 from typing import Dict, Any, List
-from datetime import datetime
+from datetime import datetime, timezone
 from core.departments.base import BaseDepartment
 
 
 class CompassDepartment(BaseDepartment):
     """
-    COMPASS Dpt. — Action and Trajectory Recommendation.
-    
-    Responsibilities:
-    - Calculate response options
-    - Evaluate trajectories
-    - Calculate separation
-    - Identify feasible headings
-    - Compare response alternatives
-    - Recommend a specific operational response
+    COMPASS Dpt. — North Integrity.
+
+    COMPASS does not recommend actions.
+    COMPASS does not calculate trajectories.
+    COMPASS does not execute.
+
+    COMPASS determines whether a proposed decision remains within North.
+
+    North is defined by the AVCS Constitution as:
+
+    1. Structural Integrity — the system remains within established operational limits.
+    2. Human Safety — people are not exposed to unacceptable risk.
+    3. Operational Control — the system retains the ability to stop.
+
+    North is:
+    - Non-negotiable
+    - Non-optimizable
+    - Non-overrideable
+
+    North is not interpreted.
+    North is applied.
     """
+
+    NORTH_CONDITIONS = {
+        "STRUCTURAL_INTEGRITY": "system remains within established operational limits",
+        "HUMAN_SAFETY": "people are not exposed to unacceptable risk",
+        "OPERATIONAL_CONTROL": "system retains the ability to stop",
+    }
 
     def __init__(self, config: Dict[str, Any] = None):
         super().__init__("COMPASS Dpt.", config)
-        self.authority_state = "NO_AUTHORITY"
+        self.authority_state = "BOUNDARY_AUTHORITY"
 
     def process(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Process incoming data and recommend action/trajectory.
-        
+        Determine whether the proposed decision remains within North.
+
         Required input fields:
-        - current_heading: Current heading (degrees)
-        - current_speed: Current speed (knots)
-        - threat_heading: Threat heading (degrees)
-        - threat_speed: Threat speed (knots)
-        - separation_required: Required separation (nautical miles)
+        - decision_proposal: the proposed decision or action
+        - operational_state: current operational state
+        - risk_assessment: risk information (optional)
+
+        Returns:
+        - assessment: WITHIN NORTH / OUTSIDE NORTH / UNDETERMINED
+        - authority_state: BOUNDARY_AUTHORITY
+        - veto: True if OUTSIDE NORTH
         """
-        # Validate input
-        required_fields = ["current_heading", "current_speed", "threat_heading", "threat_speed", "separation_required"]
-        if not self._validate_input(input_data, required_fields):
-            self._log("Missing required fields in input", "WARNING")
-            return self._create_response(
-                assessment="INVALID INPUT — Missing required fields",
-                evidence=[],
-                confidence=0.0,
-                uncertainty=["Required fields: current_heading, current_speed, threat_heading, threat_speed, separation_required"],
-                status="FAILED"
-            )
 
-        # Extract data
-        current_heading = input_data.get("current_heading")
-        current_speed = input_data.get("current_speed")
-        threat_heading = input_data.get("threat_heading")
-        threat_speed = input_data.get("threat_speed")
-        separation_required = input_data.get("separation_required")
+        decision_proposal = input_data.get("decision_proposal")
+        operational_state = input_data.get("operational_state", {})
+        risk_assessment = input_data.get("risk_assessment", {})
 
-        # Generate event ID if not provided
         self.event_id = input_data.get("event_id") or self._generate_event_id()
 
-        self._log(f"Processing compass calculation: heading={current_heading}°, speed={current_speed} kts")
+        self._log(
+            f"COMPASS boundary check — decision: {decision_proposal}"
+        )
 
-        # Calculate recommended heading
-        recommended_heading = current_heading
-        separation_achieved = 0.0
+        if not decision_proposal:
+            return self._create_response(
+                assessment="UNDETERMINED — no decision proposal provided",
+                evidence=[],
+                confidence=0.0,
+                uncertainty=["decision_proposal is required for North check"],
+                status="UNDETERMINED",
+                north_status="UNDETERMINED",
+                veto=False,
+                authority_state=self.authority_state,
+                event_id=self.event_id,
+            )
 
-        # Simple collision avoidance calculation
-        # If threat is on a collision course, recommend turning away
-        if abs(current_heading - threat_heading) < 30:
-            # Turn 90 degrees away from threat
-            recommended_heading = (current_heading + 90) % 360
-            separation_achieved = 0.8  # Simulated separation in NM
-        elif abs(current_heading - threat_heading) < 90:
-            # Turn 45 degrees away
-            recommended_heading = (current_heading + 45) % 360
-            separation_achieved = 0.5
+        # -------------------------------------------------------------------
+        # North check — structural, not interpretive
+        # -------------------------------------------------------------------
+
+        evidence: List[str] = []
+        violations: List[str] = []
+        uncertainty: List[str] = []
+
+        # Condition 1 — Structural Integrity
+        structural_integrity = operational_state.get("structural_integrity")
+        if structural_integrity is False:
+            violations.append("STRUCTURAL_INTEGRITY violated")
+            evidence.append("Structural integrity: OUTSIDE limits")
+        elif structural_integrity is True:
+            evidence.append("Structural integrity: within limits")
         else:
-            # No immediate collision risk
-            separation_achieved = 1.0
+            uncertainty.append("Structural integrity: UNKNOWN")
 
-        # Build evidence
-        evidence = [
-            f"Current heading: {current_heading}°",
-            f"Current speed: {current_speed} kts",
-            f"Threat heading: {threat_heading}°",
-            f"Threat speed: {threat_speed} kts",
-            f"Required separation: {separation_required} NM",
-            f"Recommended heading: {recommended_heading}°",
-            f"Achieved separation: {separation_achieved:.1f} NM"
-        ]
-
-        # Build uncertainty
-        uncertainty = []
-        if separation_achieved < separation_required:
-            uncertainty.append(f"Achieved separation {separation_achieved:.1f} NM < required {separation_required} NM")
-
-        # Build recommendations
-        recommendations = []
-        if recommended_heading != current_heading:
-            recommendations.append(f"Change heading to {recommended_heading}°")
-            if separation_achieved >= separation_required:
-                recommendations.append("Safe separation achieved")
-            else:
-                recommendations.append("Separation margin below requirement")
+        # Condition 2 — Human Safety
+        human_safety = operational_state.get("human_safety")
+        if human_safety is False:
+            violations.append("HUMAN_SAFETY violated")
+            evidence.append("Human safety: unacceptable risk")
+        elif human_safety is True:
+            evidence.append("Human safety: acceptable")
         else:
-            recommendations.append("Maintain current heading")
+            uncertainty.append("Human safety: UNKNOWN")
+
+        # Condition 3 — Operational Control
+        operational_control = operational_state.get("operational_control")
+        if operational_control is False:
+            violations.append("OPERATIONAL_CONTROL violated")
+            evidence.append("Operational control: cannot stop")
+        elif operational_control is True:
+            evidence.append("Operational control: retained")
+        else:
+            uncertainty.append("Operational control: UNKNOWN")
+
+        # -------------------------------------------------------------------
+        # Determine North status — structural, not interpretive
+        # -------------------------------------------------------------------
+
+        if violations:
+            north_status = "OUTSIDE NORTH"
+            veto = True
+            assessment = (
+                "OUTSIDE NORTH — decision violates: "
+                + ", ".join(violations)
+            )
+        elif uncertainty:
+            north_status = "UNDETERMINED"
+            veto = False
+            assessment = (
+                "UNDETERMINED — North compliance cannot be confirmed: "
+                + ", ".join(uncertainty)
+            )
+        else:
+            north_status = "WITHIN NORTH"
+            veto = False
+            assessment = "WITHIN NORTH — decision remains within all North conditions"
+
+        # -------------------------------------------------------------------
+        # Response
+        # -------------------------------------------------------------------
 
         return self._create_response(
-            assessment=f"Action recommendation: heading {recommended_heading}°",
+            assessment=assessment,
             evidence=evidence,
-            confidence=0.85 if separation_achieved >= separation_required else 0.70,
+            confidence=0.95 if north_status == "OUTSIDE NORTH"
+                       else 0.90 if north_status == "WITHIN NORTH"
+                       else 0.60,
             uncertainty=uncertainty,
-            constraints=[],
-            recommendations=recommendations,
+            constraints=violations,
+            recommendations=[],  # COMPASS does not recommend actions
             status="COMPLETED",
             event_id=self.event_id,
-            recommended_heading=recommended_heading,
-            separation_achieved=separation_achieved,
-            separation_required=separation_required
+            north_status=north_status,
+            veto=veto,
+            authority_state=self.authority_state,
         )
 
     def get_contract(self) -> Dict[str, Any]:
-        """Return the COMPASS Dpt. contract."""
+        """Return the COMPASS Dpt. contract — North Integrity."""
         return {
             "department": self.department_name,
-            "purpose": "Develop operational response options and calculate/recommend appropriate trajectory or action parameters",
-            "authority": self.authority_state,
-            "prohibited_decisions": [
-                "authorize the response",
-                "issue the command",
-                "directly control HELM",
-                "bypass CAPTAIN Dpt.",
-                "convert recommendation into execution"
+            "purpose": "Determine whether a proposed decision remains within North.",
+            "authority": "BOUNDARY_AUTHORITY (veto on violation of North)",
+            "question": "Does this decision remain within North?",
+            "north_conditions": self.NORTH_CONDITIONS,
+            "permitted_outputs": [
+                "WITHIN NORTH",
+                "OUTSIDE NORTH",
+                "UNDETERMINED — ESCALATION REQUIRED",
             ],
-            "permitted_recommendations": [
-                "heading",
-                "course",
-                "trajectory",
-                "separation strategy",
-                "speed adjustment",
-                "alternative response options"
-            ]
+            "prohibited_decisions": [
+                "recommend actions",
+                "calculate trajectories",
+                "issue commands",
+                "execute",
+                "interpret North",
+                "adapt North to circumstances",
+            ],
         }
