@@ -1,158 +1,219 @@
 """
 AVCS VIRTUAL COMPANY
-HELM Dpt. — Execution Readiness and Execution Control
+HELM Dpt. — Decision Authority
 
 CONTRACT:
-PURPOSE: Determine execution readiness and perform authorized operational execution
-AUTHORITY: EXECUTION ONLY
-PROHIBITED: Create independent operational objectives, authorize its own command, execute unauthorized action
+PURPOSE: Make legitimate, bounded, and structurally supported decisions under pressure.
+AUTHORITY: DECISION_AUTHORITY (within North).
+PROHIBITED: Execute, issue commands, authorize own decision, bypass COMPASS or CAPTAIN.
 """
 
 from typing import Dict, Any, List
-from datetime import datetime
+from datetime import datetime, timezone
 from core.departments.base import BaseDepartment
 
 
 class HelmDepartment(BaseDepartment):
     """
-    HELM Dpt. — Execution Readiness and Execution Control.
-    
-    Responsibilities:
-    - Assess execution feasibility
-    - Identify execution constraints
-    - Verify system readiness
-    - Execute an authorized command
-    - Report execution status
-    - Confirm execution result
+    HELM Dpt. — Decision Authority.
+
+    HELM does not execute.
+    HELM does not issue commands.
+    HELM does not authorize its own decision.
+
+    HELM receives inputs from all departments and makes a decision
+    within the boundaries defined by North.
+
+    The helm is always held by the person who carries the consequence.
     """
+
+    DECISION_STATES = {
+        "DECISION_MADE": "a legitimate decision has been made within North",
+        "NO_DECISION": "no decision could be made within North",
+        "DEFERRED": "decision deferred pending additional input",
+        "ESCALATED": "decision requires CAPTAIN review",
+    }
 
     def __init__(self, config: Dict[str, Any] = None):
         super().__init__("HELM Dpt.", config)
-        self.authority_state = "EXECUTION_ONLY"
-        self.ready = False
-        self.executed_commands = []
+        self.authority_state = "DECISION_AUTHORITY"
 
     def process(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Process incoming data and assess execution readiness.
-        
+        Make a decision based on inputs from all departments.
+
         Required input fields:
-        - action: Action to execute or assess
-        - authorized: Whether the action is authorized (bool)
-        - system_status: Current system status
+        - assessments: dict of department assessments (from Aggregator)
+        - north_status: WITHIN NORTH / OUTSIDE NORTH / UNDETERMINED (from COMPASS)
+        - stability_status: STABLE / CONDITIONALLY STABLE / UNSTABLE (from GYRO)
+        - reality_status: STRUCTURED / CONTRADICTORY / UNDETERMINED (from CHARTS)
+        - conflict_result: result of conflict detection (optional)
+
+        Returns:
+        - decision: the decision made within North
+        - decision_state: DECISION_MADE / NO_DECISION / DEFERRED / ESCALATED
+        - basis: evidence supporting the decision
+        - authority: DECISION_AUTHORITY
         """
-        # Validate input
-        required_fields = ["action", "authorized"]
-        if not self._validate_input(input_data, required_fields):
-            self._log("Missing required fields in input", "WARNING")
-            return self._create_response(
-                assessment="INVALID INPUT — Missing required fields",
-                evidence=[],
-                confidence=0.0,
-                uncertainty=["Required fields: action, authorized"],
-                status="FAILED"
-            )
 
-        # Extract data
-        action = input_data.get("action")
-        authorized = input_data.get("authorized", False)
-        system_status = input_data.get("system_status", "nominal")
-        constraints = input_data.get("constraints", [])
+        assessments = input_data.get("assessments", {})
+        north_status = input_data.get("north_status")
+        stability_status = input_data.get("stability_status")
+        reality_status = input_data.get("reality_status")
+        conflict_result = input_data.get("conflict_result", {})
 
-        # Generate event ID if not provided
         self.event_id = input_data.get("event_id") or self._generate_event_id()
 
-        self._log(f"Processing execution readiness: action='{action}', authorized={authorized}")
+        self._log(
+            f"HELM decision process — north={north_status}, "
+            f"stability={stability_status}, reality={reality_status}"
+        )
 
-        # Determine readiness
-        readiness = "READY"
-        if system_status != "nominal":
-            readiness = "DEGRADED"
-        if constraints:
-            readiness = "CONSTRAINED"
-        
-        # Determine if can execute
-        can_execute = authorized and readiness == "READY"
-        execution_result = None
+        # -------------------------------------------------------------------
+        # Decision boundary check — North
+        # -------------------------------------------------------------------
 
-        # Build evidence
-        evidence = [
-            f"Action: {action}",
-            f"Authorization: {'YES' if authorized else 'NO'}",
-            f"System status: {system_status}",
-            f"Readiness: {readiness}",
-            f"Can execute: {'YES' if can_execute else 'NO'}"
-        ]
+        evidence: List[str] = []
+        uncertainty: List[str] = []
+        constraints: List[str] = []
 
-        # If authorized and ready, execute
-        execution_status = "NOT_EXECUTED"
-        if can_execute:
-            execution_status = "EXECUTED"
-            execution_time = datetime.utcnow().isoformat() + "Z"
-            self.executed_commands.append({
-                "action": action,
-                "time": execution_time,
-                "status": "SUCCESS"
-            })
-            execution_result = f"Action '{action}' executed at {execution_time}"
-            evidence.append(f"Execution time: {execution_time}")
-        elif authorized and readiness != "READY":
-            execution_status = "BLOCKED"
-            evidence.append(f"Execution blocked: readiness={readiness}")
-            if constraints:
-                evidence.append(f"Constraints: {', '.join(constraints)}")
+        # North check (from COMPASS)
+        if north_status == "OUTSIDE NORTH":
+            return self._create_response(
+                assessment="NO_DECISION — North violation",
+                evidence=["COMPASS: OUTSIDE NORTH"],
+                confidence=0.95,
+                uncertainty=[],
+                constraints=["North violation"],
+                recommendations=["ESCALATE to CAPTAIN"],
+                status="NO_DECISION",
+                event_id=self.event_id,
+                decision=None,
+                decision_state="NO_DECISION",
+                authority_state=self.authority_state,
+            )
+        elif north_status == "UNDETERMINED":
+            uncertainty.append("North status: UNDETERMINED")
+            constraints.append("North not confirmed")
+        elif north_status == "WITHIN NORTH":
+            evidence.append("COMPASS: WITHIN NORTH")
 
-        # Build uncertainty
-        uncertainty = []
-        if not authorized:
-            uncertainty.append("Action not authorized — execution required CAPTAIN Dpt. approval")
-        if readiness != "READY":
-            uncertainty.append(f"System readiness: {readiness}")
+        # Stability check (from GYRO)
+        if stability_status == "UNSTABLE":
+            uncertainty.append("Stability: UNSTABLE")
+            constraints.append("Environment not stable for action")
+        elif stability_status == "CONDITIONALLY STABLE":
+            evidence.append("GYRO: CONDITIONALLY STABLE")
+            constraints.append("Action possible with constraints")
+        elif stability_status == "STABLE":
+            evidence.append("GYRO: STABLE")
 
-        # Build recommendations
-        recommendations = []
-        if not authorized:
-            recommendations.append("Obtain CAPTAIN Dpt. authorization")
-        if readiness != "READY":
-            recommendations.append(f"Resolve system issues: {readiness}")
-        if authorized and readiness == "READY" and not can_execute:
-            recommendations.append("Check execution conditions")
-        if can_execute:
-            recommendations.append("Execute authorized action")
+        # Reality check (from CHARTS)
+        if reality_status == "CONTRADICTORY":
+            uncertainty.append("Reality: CONTRADICTORY")
+            constraints.append("Conflicting evidence")
+        elif reality_status == "UNDETERMINED":
+            uncertainty.append("Reality: UNDETERMINED")
+        elif reality_status == "STRUCTURED":
+            evidence.append("CHARTS: STRUCTURED")
+
+        # -------------------------------------------------------------------
+        # Determine decision state — structural, not interpretive
+        # -------------------------------------------------------------------
+
+        # If North is not confirmed, defer or escalate
+        if north_status == "UNDETERMINED":
+            decision_state = "ESCALATED"
+            decision = None
+            assessment = (
+                "ESCALATED — North not confirmed; decision requires CAPTAIN review"
+            )
+        # If stability is unstable, defer
+        elif stability_status == "UNSTABLE":
+            decision_state = "DEFERRED"
+            decision = None
+            assessment = (
+                "DEFERRED — environment not stable for action"
+            )
+        # If reality is contradictory, defer
+        elif reality_status == "CONTRADICTORY":
+            decision_state = "DEFERRED"
+            decision = None
+            assessment = (
+                "DEFERRED — conflicting evidence; reality not established"
+            )
+        # If there are conflicts, escalate
+        elif conflict_result.get("has_conflicts"):
+            decision_state = "ESCALATED"
+            decision = None
+            assessment = (
+                "ESCALATED — conflicts detected; requires CAPTAIN review"
+            )
+        # Otherwise, make a decision
+        else:
+            decision_state = "DECISION_MADE"
+
+            # Decision logic — minimal structural placeholder
+            # In full AVCS, this is where the decision is formulated
+            if north_status == "WITHIN NORTH" and stability_status in ("STABLE", "CONDITIONALLY STABLE"):
+                decision = {
+                    "type": "CONTINUE_WITH_CONSTRAINTS"
+                    if constraints else "CONTINUE",
+                    "constraints": constraints,
+                    "basis": evidence,
+                }
+                assessment = (
+                    f"DECISION MADE — {decision['type']} "
+                    f"({len(constraints)} constraints)"
+                )
+            else:
+                decision_state = "DEFERRED"
+                decision = None
+                assessment = (
+                    "DEFERRED — insufficient structural support for decision"
+                )
+
+        # -------------------------------------------------------------------
+        # Response
+        # -------------------------------------------------------------------
 
         return self._create_response(
-            assessment=f"Execution readiness: {readiness}",
+            assessment=assessment,
             evidence=evidence,
-            confidence=0.90 if can_execute else 0.60,
+            confidence=0.90 if decision_state == "DECISION_MADE"
+                       else 0.80 if decision_state == "ESCALATED"
+                       else 0.70,
             uncertainty=uncertainty,
             constraints=constraints,
-            recommendations=recommendations,
-            status=execution_status,
+            recommendations=[],
+            status=decision_state,
             event_id=self.event_id,
-            readiness=readiness,
-            can_execute=can_execute,
-            authorized=authorized,
-            execution_result=execution_result,
-            action=action
+            decision=decision,
+            decision_state=decision_state,
+            basis=evidence,
+            authority_state=self.authority_state,
         )
 
     def get_contract(self) -> Dict[str, Any]:
-        """Return the HELM Dpt. contract."""
+        """Return the HELM Dpt. contract — Decision Authority."""
         return {
             "department": self.department_name,
-            "purpose": "Determine execution readiness and perform authorized operational execution",
-            "authority": "EXECUTION_ONLY",
-            "prohibited_decisions": [
-                "create independent operational objectives",
-                "authorize its own command",
-                "execute an unauthorized action",
-                "suppress execution failure",
-                "redefine an authorized command without authority"
+            "purpose": "Make legitimate, bounded, and structurally supported decisions under pressure.",
+            "authority": "DECISION_AUTHORITY (within North)",
+            "question": "What decision should be made?",
+            "decision_states": self.DECISION_STATES,
+            "permitted_outputs": [
+                "DECISION_MADE",
+                "NO_DECISION",
+                "DEFERRED",
+                "ESCALATED",
             ],
-            "permitted_recommendations": [
-                "execution feasibility",
-                "alternative execution method",
-                "delay due to technical limitation",
-                "technical constraint requiring CAPTAIN review"
-            ]
+            "prohibited_decisions": [
+                "execute",
+                "issue commands",
+                "authorize own decision",
+                "bypass COMPASS",
+                "bypass CAPTAIN",
+                "violate North",
+            ],
         }
