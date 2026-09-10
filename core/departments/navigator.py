@@ -1,142 +1,205 @@
 """
 AVCS VIRTUAL COMPANY
-NAVIGATOR Dpt. — Threat and Situation Assessment
+NAVIGATOR Dpt. — Strategy & Direction
 
 CONTRACT:
-PURPOSE: Assess operational situation and determine potential threat, consequence, and need for intervention
-AUTHORITY: NONE
-PROHIBITED: Authorize intervention, issue execution commands, override human authority
+PURPOSE: Define the course and anticipate change.
+AUTHORITY: STRATEGIC_PROPOSAL_AUTHORITY.
+PROHIBITED: Authorize action, execute, issue commands, assess final threat, override human authority.
 """
 
 from typing import Dict, Any, List
-from datetime import datetime
+from datetime import datetime, timezone
 from core.departments.base import BaseDepartment
 
 
 class NavigatorDepartment(BaseDepartment):
     """
-    NAVIGATOR Dpt. — Threat and Situation Assessment.
-    
-    Responsibilities:
-    - Assess the developing situation
-    - Identify potential threats
-    - Project consequences
-    - Assess time-to-event
-    - Determine whether intervention appears operationally necessary
-    - Identify decision dependencies
-    - Evaluate available response requirements
+    NAVIGATOR Dpt. — Strategy & Direction.
+
+    NAVIGATOR does not authorize.
+    NAVIGATOR does not execute.
+    NAVIGATOR does not determine final threat.
+
+    NAVIGATOR proposes a course.
+    NAVIGATOR anticipates change.
+    NAVIGATOR defines direction.
+
+    A navigator proposes the course.
+    The helm decides.
     """
+
+    COURSE_STATES = {
+        "PROPOSED": "a strategic course has been proposed",
+        "MAINTAIN": "current course should be maintained",
+        "ADJUST": "current course should be adjusted",
+        "REORIENT": "strategic direction should be reoriented",
+        "DEFERRED": "course proposal deferred pending additional input",
+    }
 
     def __init__(self, config: Dict[str, Any] = None):
         super().__init__("NAVIGATOR Dpt.", config)
-        self.authority_state = "NO_AUTHORITY"
+        self.authority_state = "STRATEGIC_PROPOSAL_AUTHORITY"
 
     def process(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Process incoming data and assess threat/situation.
-        
+        Propose a strategic course and anticipate change.
+
         Required input fields:
-        - situation: Description of the situation
-        - time_to_event: Estimated time to potential impact (minutes)
+        - current_state: current operational state (from other departments)
+        - strategic_context: broader context for strategic direction (optional)
+        - anticipated_changes: expected changes in the environment (optional)
+
+        Returns:
+        - course: proposed strategic direction
+        - basis: evidence supporting the proposal
+        - anticipated_changes: expected changes
+        - risk_factors: strategic risks
+        - course_state: PROPOSED / MAINTAIN / ADJUST / REORIENT / DEFERRED
         """
-        # Validate input
-        required_fields = ["situation", "time_to_event"]
-        if not self._validate_input(input_data, required_fields):
-            self._log("Missing required fields in input", "WARNING")
-            return self._create_response(
-                assessment="INVALID INPUT — Missing required fields",
-                evidence=[],
-                confidence=0.0,
-                uncertainty=["Required fields: situation, time_to_event"],
-                status="FAILED"
-            )
 
-        # Extract data
-        situation = input_data.get("situation")
-        time_to_event = input_data.get("time_to_event")
-        confidence_level = input_data.get("confidence", 0.7)
-        additional_evidence = input_data.get("evidence", [])
+        current_state = input_data.get("current_state", {})
+        strategic_context = input_data.get("strategic_context", {})
+        anticipated_changes = input_data.get("anticipated_changes", [])
 
-        # Generate event ID if not provided
         self.event_id = input_data.get("event_id") or self._generate_event_id()
 
-        self._log(f"Processing threat assessment: {situation} (time: {time_to_event} min)")
+        self._log(
+            f"NAVIGATOR strategic proposal — "
+            f"context={bool(strategic_context)}, "
+            f"changes={len(anticipated_changes)}"
+        )
 
-        # Build evidence
-        evidence = [
-            f"Situation: {situation}",
-            f"Time to event: {time_to_event} minutes",
-            f"Assessment time: {datetime.utcnow().isoformat()}Z"
-        ]
-        if additional_evidence:
-            evidence.extend(additional_evidence)
+        # -------------------------------------------------------------------
+        # Strategic proposal — direction, not threat
+        # -------------------------------------------------------------------
 
-        # Determine threat level based on time to event
-        threat_level = "LOW"
-        if time_to_event <= 5:
-            threat_level = "CRITICAL"
-        elif time_to_event <= 15:
-            threat_level = "HIGH"
-        elif time_to_event <= 30:
-            threat_level = "MEDIUM"
-        
-        # Determine intervention requirement
-        intervention_required = False
-        if threat_level in ["CRITICAL", "HIGH"]:
-            intervention_required = True
+        evidence: List[str] = []
+        uncertainty: List[str] = []
+        risk_factors: List[str] = []
 
-        # Build uncertainty
-        uncertainty = []
-        if not input_data.get("intent"):
-            uncertainty.append("Intent unknown")
-        if not input_data.get("origin"):
-            uncertainty.append("Origin unknown")
-        if confidence_level < 0.8:
-            uncertainty.append(f"Confidence level: {confidence_level:.2f}")
-
-        # Build recommendations
-        recommendations = []
-        if intervention_required:
-            recommendations.append(f"Intervention required: {threat_level} threat")
-            recommendations.append("Escalate immediately")
-        elif threat_level == "MEDIUM":
-            recommendations.append("Monitor closely")
-            recommendations.append("Prepare for possible intervention")
+        # Current state
+        if current_state:
+            evidence.append(
+                f"Current state: {len(current_state)} inputs received"
+            )
+            for key, value in current_state.items():
+                evidence.append(f"{key}: {value}")
         else:
-            recommendations.append("Continue monitoring")
+            uncertainty.append("Current state not provided")
+
+        # Strategic context
+        if strategic_context:
+            for key, value in strategic_context.items():
+                evidence.append(f"Strategic context — {key}: {value}")
+        else:
+            uncertainty.append("Strategic context not provided")
+
+        # Anticipated changes
+        if anticipated_changes:
+            for change in anticipated_changes:
+                evidence.append(f"Anticipated change: {change}")
+        else:
+            uncertainty.append("No anticipated changes provided")
+
+        # Risk factors
+        for key, value in strategic_context.items():
+            if "risk" in key.lower() or "threat" in key.lower():
+                risk_factors.append(f"{key}: {value}")
+
+        # -------------------------------------------------------------------
+        # Determine course state — structural, not interpretive
+        # -------------------------------------------------------------------
+
+        if not current_state and not strategic_context:
+            course_state = "DEFERRED"
+            course = None
+            assessment = (
+                "DEFERRED — insufficient input for strategic proposal"
+            )
+        elif not anticipated_changes and not strategic_context:
+            course_state = "MAINTAIN"
+            course = {
+                "direction": "MAINTAIN_CURRENT",
+                "basis": evidence,
+            }
+            assessment = (
+                "MAINTAIN — no strategic changes anticipated; "
+                "maintain current course"
+            )
+        elif risk_factors:
+            course_state = "ADJUST"
+            course = {
+                "direction": "ADJUST_COURSE",
+                "basis": evidence,
+                "risk_factors": risk_factors,
+            }
+            assessment = (
+                f"ADJUST — {len(risk_factors)} strategic risk factors identified; "
+                "course adjustment recommended"
+            )
+        else:
+            course_state = "PROPOSED"
+            course = {
+                "direction": "PROPOSE_COURSE",
+                "basis": evidence,
+                "anticipated_changes": anticipated_changes,
+            }
+            assessment = (
+                f"PROPOSED — strategic course proposed based on "
+                f"{len(evidence)} inputs"
+            )
+
+        # -------------------------------------------------------------------
+        # Response
+        # -------------------------------------------------------------------
 
         return self._create_response(
-            assessment=f"Threat assessment: {threat_level} — {situation}",
+            assessment=assessment,
             evidence=evidence,
-            confidence=confidence_level,
+            confidence=0.85 if course_state == "PROPOSED"
+                       else 0.80 if course_state == "ADJUST"
+                       else 0.75 if course_state == "MAINTAIN"
+                       else 0.60,
             uncertainty=uncertainty,
-            constraints=[],
-            recommendations=recommendations,
+            constraints=risk_factors,
+            recommendations=[course_state],
             status="COMPLETED",
             event_id=self.event_id,
-            threat_level=threat_level,
-            intervention_required=intervention_required,
-            time_to_event=time_to_event
+            course=course,
+            course_state=course_state,
+            anticipated_changes=anticipated_changes,
+            risk_factors=risk_factors,
+            authority_state=self.authority_state,
         )
 
     def get_contract(self) -> Dict[str, Any]:
-        """Return the NAVIGATOR Dpt. contract."""
+        """Return the NAVIGATOR Dpt. contract — Strategy & Direction."""
         return {
             "department": self.department_name,
-            "purpose": "Assess operational situation and determine potential threat, consequence, and need for intervention",
-            "authority": self.authority_state,
-            "prohibited_decisions": [
-                "authorize intervention",
-                "issue execution commands",
-                "directly control HELM",
-                "override human authority",
-                "represent recommendation as authorization"
+            "purpose": "Define the course and anticipate change.",
+            "authority": "STRATEGIC_PROPOSAL_AUTHORITY",
+            "question": "Where should we go?",
+            "course_states": self.COURSE_STATES,
+            "permitted_outputs": [
+                "PROPOSED",
+                "MAINTAIN",
+                "ADJUST",
+                "REORIENT",
+                "DEFERRED",
             ],
             "permitted_recommendations": [
-                "intervention",
-                "continued monitoring",
-                "additional assessment",
-                "escalation",
-                "consideration of specified response options"
-            ]
+                "strategic direction",
+                "course of action",
+                "alternative courses",
+                "anticipation of change",
+            ],
+            "prohibited_decisions": [
+                "authorize action",
+                "execute",
+                "issue commands",
+                "assess final threat",
+                "override human authority",
+                "determine operational response",
+            ],
         }
