@@ -511,3 +511,282 @@ with tab2:
             event_data["system_condition"] = "NOMINAL"
             event_data["load_level"] = "MEDIUM"
             event_data["environmental_conditions"] = {}
+
+            # NAVIGATOR: strategy
+            event_data["current_state"] = {"event_type": event_data.get("event_type"), "severity": event_data.get("severity")}
+            event_data["strategic_context"] = {}
+            event_data["anticipated_changes"] = []
+
+            # COMPASS: North check
+            event_data["operational_state"] = {
+                "structural_integrity": True,
+                "human_safety": True,
+                "operational_control": True,
+            }
+            event_data["decision_proposal"] = event_data.get("decision_proposal", "Awaiting assessment")
+
+            # HELM: decision inputs (populated after COMPASS/GYRO/CHARTS)
+            # CAPTAIN: review inputs (populated after HELM)
+
+            state_machine.start(st.session_state.event_id)
+            state_machine.dispatch()
+            dispatcher_results = dispatcher.process_incoming_event(event_data)
+
+            state_machine.process()
+            task_packets = dispatcher_results.get("task_packets", [])
+            department_results = {}
+
+            for packet in task_packets:
+                dept_name = packet["department"]
+                dept_data = packet["data"]
+
+                if dept_name == "LOOKOUT Dpt.":
+                    department_results[dept_name] = lookout.process(dept_data)
+                elif dept_name == "CHARTS Dpt.":
+                    department_results[dept_name] = charts.process(dept_data)
+                elif dept_name == "GYRO Dpt.":
+                    department_results[dept_name] = gyro.process(dept_data)
+                elif dept_name == "NAVIGATOR Dpt.":
+                    department_results[dept_name] = navigator.process(dept_data)
+                elif dept_name == "COMPASS Dpt.":
+                    department_results[dept_name] = compass.process(dept_data)
+                elif dept_name == "HELM Dpt.":
+                    department_results[dept_name] = helm.process(dept_data)
+                elif dept_name == "CAPTAIN Dpt.":
+                    department_results[dept_name] = captain.process(dept_data)
+                else:
+                    department_results[dept_name] = {"error": f"Unknown department: {dept_name}"}
+
+            state_machine.aggregate()
+            aggregated_state = aggregator.aggregate(department_results, st.session_state.event_id)
+
+            state_machine.detect_conflicts()
+            conflict_result = conflict_detector.detect(aggregated_state)
+
+            state_machine.formulate_decision()
+            decision_proposal = decision_engine.formulate(aggregated_state, conflict_result)
+
+            state_machine.wait_for_authority()
+            authority_state = authority_gate.present_decision(decision_proposal)
+
+            st.session_state.dispatcher_results = dispatcher_results
+            st.session_state.department_results = department_results
+            st.session_state.aggregated_state = aggregated_state
+            st.session_state.conflict_result = conflict_result
+            st.session_state.decision_proposal = decision_proposal
+            st.session_state.authority_state = authority_state
+            st.session_state.current_step = "authority"
+
+            registry = IncidentRegistry()
+            registry.update_incident(
+                st.session_state.event_id,
+                {
+                    "decision_proposal": decision_proposal,
+                    "authorized": False,
+                    "status": "AWAITING_AUTHORITY",
+                },
+            )
+
+            st.rerun()
+
+    # Display department results
+    if st.session_state.get("department_results"):
+        st.subheader("Department Assessments (INS-A)")
+        for dept, result in st.session_state.department_results.items():
+            with st.expander(f"📋 {dept}"):
+                if isinstance(result, dict) and "error" in result:
+                    st.error(result["error"])
+                else:
+                    st.json(result)
+
+    # Display aggregated state
+    if st.session_state.get("aggregated_state"):
+        st.subheader("📊 Aggregated State")
+        st.json(st.session_state.aggregated_state)
+
+        structural = st.session_state.aggregated_state.get("structural", {})
+        if structural:
+            st.subheader("🧭 Structural Fields (INS-A)")
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("North", structural.get("north_status", "—"))
+                st.metric("Veto", "YES" if structural.get("veto") else "NO")
+            with col2:
+                st.metric("Stability", structural.get("stability_status", "—"))
+                st.metric("Load", structural.get("load_level", "—"))
+            with col3:
+                st.metric("Reality", structural.get("reality_status", "—"))
+                st.metric("Coherence", structural.get("structural_coherence", "—"))
+            st.json(structural)
+
+    # Display conflicts
+    if st.session_state.get("conflict_result"):
+        st.subheader("⚠️ Conflict Detection")
+        if st.session_state.conflict_result.get("has_conflicts"):
+            st.warning("Conflicts detected!")
+        else:
+            st.success("No conflicts detected")
+        st.json(st.session_state.conflict_result)
+
+# ===========================================================================
+# TAB 3: DECISION
+# ===========================================================================
+
+with tab3:
+    st.header("Decision Authority")
+
+    if st.session_state.get("decision_proposal"):
+        st.subheader("Decision Proposal")
+        st.json(st.session_state.decision_proposal)
+
+    if st.session_state.get("authority_state"):
+        st.subheader("Authority Gate")
+        st.json(st.session_state.authority_state)
+
+        if st.session_state.authority_state.get("status") == "PENDING":
+            st.divider()
+            st.markdown("### 🔐 Human Authorization Required")
+
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button("✅ Approve", type="primary"):
+                    st.session_state.authorized = True
+                    st.session_state.current_step = "executing"
+                    registry = IncidentRegistry()
+                    registry.update_incident(st.session_state.event_id, {
+                        "authorized": True,
+                        "status": "AUTHORIZED",
+                    })
+                    st.rerun()
+            with col2:
+                if st.button("❌ Reject", type="secondary"):
+                    st.session_state.authorized = False
+                    st.session_state.current_step = "completed"
+                    registry = IncidentRegistry()
+                    registry.update_incident(st.session_state.event_id, {
+                        "authorized": False,
+                        "status": "REJECTED",
+                    })
+                    st.rerun()
+
+        if st.session_state.get("authorized") is True:
+            st.success("✅ Decision Authorized")
+            st.session_state.current_step = "completed"
+        elif st.session_state.get("authorized") is False:
+            st.error("❌ Decision Rejected")
+
+# ===========================================================================
+# TAB 4: RECORD
+# ===========================================================================
+
+with tab4:
+    st.header("AVCS Decision Record")
+
+    if st.session_state.current_step == "completed" or st.session_state.get("authorized") is not None:
+        st.success("Decision Cycle Completed — Authorized") if st.session_state.get("authorized") \
+            else st.info("Decision Cycle Completed — Rejected")
+
+        record = {
+            "event_id": st.session_state.event_id,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "status": "COMPLETED",
+            "authorized": st.session_state.authorized,
+            "decision_proposal": st.session_state.decision_proposal,
+            "authority_state": st.session_state.authority_state,
+            "aggregated_state": st.session_state.aggregated_state,
+            "conflict_result": st.session_state.conflict_result,
+        }
+
+        st.json(record)
+
+        st.download_button(
+            label="📥 Download AVCS Record",
+            data=json.dumps(record, indent=2),
+            file_name=f"AVCS_RECORD_{st.session_state.event_id}.json",
+            mime="application/json",
+        )
+    else:
+        st.info("Complete the decision cycle to generate AVCS Record")
+
+# ===========================================================================
+# TAB 5: INCIDENT REGISTRY
+# ===========================================================================
+
+with tab5:
+    st.header("📋 Incident Registry")
+    st.caption("История всех обработанных инцидентов. Автоочистка >30 дней.")
+
+    registry = IncidentRegistry()
+    incidents = registry.get_all_incidents()
+    stats = registry.get_statistics()
+
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        st.metric("Total Incidents", stats["total"])
+    with col2:
+        st.metric("Event Types", len(stats["by_type"]))
+    with col3:
+        st.metric("Critical", stats["by_severity"].get("CRITICAL", 0))
+    with col4:
+        st.metric("Authorized", stats["by_status"].get("AUTHORIZED", 0))
+
+    st.divider()
+
+    col1, col2 = st.columns(2)
+    with col1:
+        filter_type = st.selectbox("Filter by Event Type", ["All"] + list(stats["by_type"].keys()))
+    with col2:
+        filter_status = st.selectbox("Filter by Status", ["All"] + list(stats["by_status"].keys()))
+
+    filtered_incidents = incidents
+    if filter_type != "All":
+        filtered_incidents = [i for i in filtered_incidents if i.get("event_type") == filter_type]
+    if filter_status != "All":
+        filtered_incidents = [i for i in filtered_incidents if i.get("status") == filter_status]
+
+    if not filtered_incidents:
+        st.info("No incidents found.")
+    else:
+        st.write(f"Showing {len(filtered_incidents)} of {len(incidents)} incidents")
+
+        for incident in reversed(filtered_incidents[-50:]):
+            with st.expander(f"{incident['event_id']} — {incident['event_type']} ({incident['status']})"):
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.write(f"**Description:** {incident.get('description', 'N/A')}")
+                    st.write(f"**Severity:** {incident.get('severity', 'UNKNOWN')}")
+                    st.write(f"**Authorized:** {incident.get('authorized', False)}")
+                with col2:
+                    st.write(f"**Timestamp:** {incident.get('timestamp', 'N/A')}")
+                    if incident.get("critical_conditions"):
+                        st.write("**Critical Conditions:**")
+                        for cond in incident.get("critical_conditions", []):
+                            st.write(
+                                f"- {cond.get('condition', 'UNKNOWN')} "
+                                f"({cond.get('severity', 'UNKNOWN')}) — "
+                                f"{cond.get('semantic_state', 'UNKNOWN')} "
+                                f"/ confidence {cond.get('confidence', 0):.2f}"
+                            )
+
+                if st.button("View Record", key=f"view_{incident['event_id']}"):
+                    st.json(incident.get("record", {}))
+
+    st.divider()
+
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("🗑️ Clear Old Records (>30 days)"):
+            removed = registry.clear_old_records(30)
+            if removed > 0:
+                st.success(f"Removed {removed} old records.")
+            else:
+                st.info("No records older than 30 days.")
+            st.rerun()
+
+    with col2:
+        if st.button("🗑️ Clear All Records (Danger)"):
+            confirm = st.checkbox("I understand this will delete ALL records", key="confirm_clear_all")
+            if confirm:
+                count = registry.clear_all()
+                st.warning(f"Deleted {count} records.")
+                st.rerun()
