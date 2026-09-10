@@ -1,129 +1,197 @@
 """
 AVCS VIRTUAL COMPANY
-LOOKOUT Dpt. — Detection and Observation
+LOOKOUT Dpt. — Foresight & Anticipation
 
 CONTRACT:
-PURPOSE: Detect and report observable operational events
-AUTHORITY: NONE
-PROHIBITED: Authorize maneuver, issue commands, determine final threat
+PURPOSE: Detect weak signals, anticipate change, and identify early deviation indicators.
+AUTHORITY: SIGNAL_AUTHORITY.
+PROHIBITED: Authorize action, execute, issue commands, determine final threat, suppress signals.
 """
 
 from typing import Dict, Any, List
-from datetime import datetime
+from datetime import datetime, timezone
 from core.departments.base import BaseDepartment
 
 
 class LookoutDepartment(BaseDepartment):
     """
-    LOOKOUT Dpt. — Detection and Observation.
-    
-    Responsibilities:
-    - Detect objects or events
-    - Identify observable characteristics
-    - Establish initial position
-    - Establish bearing/range where available
-    - Identify movement
-    - Establish observation timestamps
-    - Distinguish known from unknown information
+    LOOKOUT Dpt. — Foresight & Anticipation.
+
+    LOOKOUT does not authorize.
+    LOOKOUT does not execute.
+    LOOKOUT does not determine final threat.
+
+    LOOKOUT detects weak signals.
+    LOOKOUT anticipates change.
+    LOOKOUT identifies early deviation indicators.
+
+    Good navigation begins before the storm appears.
     """
+
+    SIGNAL_STATES = {
+        "SIGNAL_DETECTED": "a weak signal has been detected",
+        "TREND_EMERGING": "a pattern is emerging across multiple signals",
+        "DEVIATION_INDICATED": "an early deviation indicator has been identified",
+        "NO_SIGNAL": "no signal detected",
+        "UNDETERMINED": "signal status cannot be determined",
+    }
 
     def __init__(self, config: Dict[str, Any] = None):
         super().__init__("LOOKOUT Dpt.", config)
-        self.authority_state = "NO_AUTHORITY"
+        self.authority_state = "SIGNAL_AUTHORITY"
 
     def process(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Process incoming data and detect observable events.
-        
+        Detect weak signals and anticipate change.
+
         Required input fields:
-        - object: Description of detected object
-        - position: Location information
-        - timestamp: Time of observation (optional)
+        - observations: list of observed signals (optional)
+        - trends: list of emerging trends (optional)
+        - deviations: list of early deviation indicators (optional)
+        - context: broader operational context (optional)
+
+        Returns:
+        - signals: detected weak signals
+        - trends: emerging trends
+        - deviations: early deviation indicators
+        - signal_state: SIGNAL_DETECTED / TREND_EMERGING / DEVIATION_INDICATED / NO_SIGNAL / UNDETERMINED
+        - trajectory: anticipated trajectory of change
         """
-        # Validate input
-        required_fields = ["object", "position"]
-        if not self._validate_input(input_data, required_fields):
-            self._log("Missing required fields in input", "WARNING")
-            return self._create_response(
-                assessment="INVALID INPUT — Missing required fields",
-                evidence=[],
-                confidence=0.0,
-                uncertainty=["Required fields: object, position"],
-                status="FAILED"
-            )
 
-        # Extract data
-        detected_object = input_data.get("object", "unknown")
-        position = input_data.get("position", "unknown")
-        timestamp = input_data.get("timestamp", datetime.utcnow().isoformat() + "Z")
-        additional_observations = input_data.get("observations", [])
+        observations = input_data.get("observations", [])
+        trends = input_data.get("trends", [])
+        deviations = input_data.get("deviations", [])
+        context = input_data.get("context", {})
 
-        # Generate event ID if not provided
         self.event_id = input_data.get("event_id") or self._generate_event_id()
 
-        self._log(f"Processing detection: {detected_object} at {position}")
+        self._log(
+            f"LOOKOUT foresight scan — "
+            f"observations={len(observations)}, "
+            f"trends={len(trends)}, "
+            f"deviations={len(deviations)}"
+        )
 
-        # Build evidence
-        evidence = [
-            f"Object detected: {detected_object}",
-            f"Position: {position}",
-            f"Observation time: {timestamp}"
-        ]
-        if additional_observations:
-            evidence.extend(additional_observations)
+        # -------------------------------------------------------------------
+        # Foresight and anticipation — weak signals, not final threat
+        # -------------------------------------------------------------------
 
-        # Determine if classification is known
-        classification_status = input_data.get("classification", "UNKNOWN")
+        evidence: List[str] = []
+        uncertainty: List[str] = []
+        trajectory: List[str] = []
 
-        # Build uncertainty
-        uncertainty = [
-            f"Classification: {classification_status}",
-            "Intent: UNKNOWN",
-            "Origin: UNKNOWN",
-            "Operator: UNKNOWN"
-        ]
+        # Observations
+        if observations:
+            for obs in observations:
+                evidence.append(f"OBSERVATION: {obs}")
+        else:
+            uncertainty.append("No observations provided")
 
-        # Determine if escalation is recommended
-        escalation_recommended = input_data.get("escalate", True)
+        # Trends
+        if trends:
+            for trend in trends:
+                evidence.append(f"TREND: {trend}")
+        else:
+            uncertainty.append("No emerging trends provided")
 
-        # Build recommendations
-        recommendations = [
-            "Continue observation",
-            "Maintain tracking",
-        ]
-        if escalation_recommended:
-            recommendations.append("Escalate for assessment")
+        # Deviations
+        if deviations:
+            for dev in deviations:
+                evidence.append(f"DEVIATION: {dev}")
+        else:
+            uncertainty.append("No early deviation indicators provided")
+
+        # Context
+        if context:
+            for key, value in context.items():
+                evidence.append(f"CONTEXT — {key}: {value}")
+        else:
+            uncertainty.append("No operational context provided")
+
+        # Trajectory anticipation
+        if deviations:
+            trajectory.append(
+                "Deviation indicators suggest boundary movement"
+            )
+        if trends:
+            trajectory.append(
+                f"{len(trends)} trends suggest direction of change"
+            )
+        if not trajectory:
+            trajectory.append("No clear trajectory anticipated")
+
+        # -------------------------------------------------------------------
+        # Determine signal state — structural, not interpretive
+        # -------------------------------------------------------------------
+
+        if deviations:
+            signal_state = "DEVIATION_INDICATED"
+            assessment = (
+                f"DEVIATION INDICATED — {len(deviations)} early "
+                "deviation indicators identified"
+            )
+        elif trends:
+            signal_state = "TREND_EMERGING"
+            assessment = (
+                f"TREND EMERGING — {len(trends)} trends identified"
+            )
+        elif observations:
+            signal_state = "SIGNAL_DETECTED"
+            assessment = (
+                f"SIGNAL DETECTED — {len(observations)} observations"
+            )
+        elif not observations and not trends and not deviations:
+            signal_state = "NO_SIGNAL"
+            assessment = "NO SIGNAL — no weak signals detected"
+        else:
+            signal_state = "UNDETERMINED"
+            assessment = "UNDETERMINED — signal status unclear"
+
+        # -------------------------------------------------------------------
+        # Response
+        # -------------------------------------------------------------------
 
         return self._create_response(
-            assessment=f"Detection confirmed: {detected_object} at {position}",
+            assessment=assessment,
             evidence=evidence,
-            confidence=0.85,
+            confidence=0.85 if signal_state == "DEVIATION_INDICATED"
+                       else 0.80 if signal_state == "TREND_EMERGING"
+                       else 0.75 if signal_state == "SIGNAL_DETECTED"
+                       else 0.60,
             uncertainty=uncertainty,
             constraints=[],
-            recommendations=recommendations,
+            recommendations=[],
             status="COMPLETED",
             event_id=self.event_id,
-            classification=classification_status,
-            escalation="RECOMMENDED" if escalation_recommended else "NOT RECOMMENDED"
+            signal_state=signal_state,
+            signals=observations,
+            trends=trends,
+            deviations=deviations,
+            trajectory=trajectory,
+            authority_state=self.authority_state,
         )
 
     def get_contract(self) -> Dict[str, Any]:
-        """Return the LOOKOUT Dpt. contract."""
+        """Return the LOOKOUT Dpt. contract — Foresight & Anticipation."""
         return {
             "department": self.department_name,
-            "purpose": "Detect and report observable operational events",
-            "authority": self.authority_state,
-            "prohibited_decisions": [
-                "authorize maneuver",
-                "issue operational commands",
-                "determine final threat status",
-                "authorize intervention",
-                "suppress observations"
+            "purpose": "Detect weak signals, anticipate change, and identify early deviation indicators.",
+            "authority": "SIGNAL_AUTHORITY",
+            "question": "What is changing?",
+            "signal_states": self.SIGNAL_STATES,
+            "permitted_outputs": [
+                "SIGNAL_DETECTED",
+                "TREND_EMERGING",
+                "DEVIATION_INDICATED",
+                "NO_SIGNAL",
+                "UNDETERMINED",
             ],
-            "permitted_recommendations": [
-                "further observation",
-                "tracking",
-                "information verification",
-                "escalation for assessment"
-            ]
+            "prohibited_decisions": [
+                "authorize action",
+                "execute",
+                "issue commands",
+                "determine final threat",
+                "suppress signals",
+                "interpret North",
+            ],
         }
