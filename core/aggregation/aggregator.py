@@ -26,32 +26,24 @@ class Aggregator:
     - Build consolidated state
     """
 
-    # Structural fields — preserved if present in any department output
     STRUCTURAL_FIELDS = [
-        # COMPASS
         "north_status",
         "veto",
-        # GYRO
         "stability_status",
         "load_level",
-        # CHARTS
         "reality_status",
         "reality_confidence",
         "facts",
         "unknowns",
         "contradictions",
-        # HELM
         "decision",
         "decision_state",
-        # CAPTAIN
         "structural_coherence",
         "role_integrity",
         "north_integrity",
         "decision_quality",
-        # NAVIGATOR
         "course",
         "course_state",
-        # LOOKOUT
         "signal_state",
         "trajectory",
     ]
@@ -63,19 +55,8 @@ class Aggregator:
     def aggregate(self, department_results: Dict[str, Any], event_id: str) -> Dict[str, Any]:
         """
         Aggregate Department results into a consolidated operational state.
-
-        Args:
-            department_results: Dictionary of Department outputs
-            event_id: Event ID for this aggregation
-
-        Returns:
-            Consolidated operational state
         """
         self._log(f"Aggregating results for event: {event_id}")
-
-        # -------------------------------------------------------------------
-        # Collect standard fields
-        # -------------------------------------------------------------------
 
         assessments: Dict[str, Any] = {}
         evidence: List[Any] = []
@@ -84,21 +65,14 @@ class Aggregator:
         constraints: List[Any] = []
         conflicts: List[Dict[str, Any]] = []
         confidence_scores: List[float] = []
-
-        # -------------------------------------------------------------------
-        # Collect structural fields
-        # -------------------------------------------------------------------
-
         structural: Dict[str, Any] = {}
 
         for dept_name, result in department_results.items():
             if not isinstance(result, dict):
                 continue
-
             if "error" in result:
                 continue
 
-            # Standard fields
             assessments[dept_name] = result.get("assessment", "Unknown")
             evidence.extend(result.get("evidence", []) or [])
             recommendations.extend(result.get("recommendations", []) or [])
@@ -108,21 +82,15 @@ class Aggregator:
             if result.get("confidence") is not None:
                 confidence_scores.append(result.get("confidence"))
 
-            # Conflict detection
             if result.get("conflict") or result.get("conflicts"):
                 conflicts.append({
                     "department": dept_name,
                     "conflict": result.get("conflict") or result.get("conflicts"),
                 })
 
-            # Structural fields (preserved if present)
             for field in self.STRUCTURAL_FIELDS:
                 if field in result and result[field] is not None:
                     structural[field] = result[field]
-
-        # -------------------------------------------------------------------
-        # Calculate overall confidence
-        # -------------------------------------------------------------------
 
         overall_confidence = None
         if confidence_scores:
@@ -130,15 +98,11 @@ class Aggregator:
 
         has_conflict = len(conflicts) > 0
 
-        # -------------------------------------------------------------------
-        # Build consolidated operational state
-        # -------------------------------------------------------------------
-
-        operational_state = {
+        operational_state: Dict[str, Any] = {
             "event_id": event_id,
             "timestamp": datetime.utcnow().isoformat() + "Z",
             "assessments": assessments,
-            "evidence": list(dict.fromkeys(evidence)),  # dedup, preserve order
+            "evidence": list(dict.fromkeys(evidence)),
             "recommendations": list(dict.fromkeys(recommendations)),
             "uncertainty": list(dict.fromkeys(uncertainty)),
             "constraints": list(dict.fromkeys(constraints)),
@@ -152,23 +116,15 @@ class Aggregator:
             "status": "CONSOLIDATED",
         }
 
-        # Add structural fields if any were preserved
         if structural:
             operational_state["structural"] = structural
 
-        # -------------------------------------------------------------------
-        # Log aggregation
-        # -------------------------------------------------------------------
-
         self.aggregation_log.append(operational_state)
-
         return operational_state
 
     def _log(self, message: str, level: str = "INFO"):
-        """Simple logging for Aggregator."""
         timestamp = datetime.utcnow().isoformat() + "Z"
         print(f"[{timestamp}] [AGGREGATOR] [{level}] {message}")
 
     def get_aggregation_log(self) -> List[Dict[str, Any]]:
-        """Return the aggregation log."""
         return self.aggregation_log
