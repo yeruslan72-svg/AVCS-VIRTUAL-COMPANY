@@ -1,12 +1,6 @@
 """
 AVCS VIRTUAL COMPANY
 Aggregator — Consolidated Operational State
-
-FUNCTION:
-- Receive outputs from functional Dpts.
-- Construct a consolidated operational state
-- Preserve evidence, conflicts, recommendations, uncertainty
-- Preserve structural fields from Constitution-compliant departments
 """
 
 from typing import Dict, Any, List, Optional
@@ -14,38 +8,15 @@ from datetime import datetime
 
 
 class Aggregator:
-    """
-    Aggregator constructs a consolidated operational state from Department outputs.
-
-    Responsibilities:
-    - Collect Department assessments
-    - Synthesize evidence
-    - Identify conflicts
-    - Preserve uncertainty
-    - Preserve structural fields (North, stability, reality, decision, coherence)
-    - Build consolidated state
-    """
-
     STRUCTURAL_FIELDS = [
-        "north_status",
-        "veto",
-        "stability_status",
-        "load_level",
-        "reality_status",
-        "reality_confidence",
-        "facts",
-        "unknowns",
-        "contradictions",
-        "decision",
-        "decision_state",
-        "structural_coherence",
-        "role_integrity",
-        "north_integrity",
-        "decision_quality",
-        "course",
-        "course_state",
-        "signal_state",
-        "trajectory",
+        "north_status", "veto",
+        "stability_status", "load_level",
+        "reality_status", "reality_confidence",
+        "facts", "unknowns", "contradictions",
+        "decision", "decision_state",
+        "structural_coherence", "role_integrity", "north_integrity", "decision_quality",
+        "course", "course_state",
+        "signal_state", "trajectory",
     ]
 
     def __init__(self, config: Dict[str, Any] = None):
@@ -53,9 +24,6 @@ class Aggregator:
         self.aggregation_log = []
 
     def aggregate(self, department_results: Dict[str, Any], event_id: str) -> Dict[str, Any]:
-        """
-        Aggregate Department results into a consolidated operational state.
-        """
         self._log(f"Aggregating results for event: {event_id}")
 
         assessments: Dict[str, Any] = {}
@@ -69,8 +37,10 @@ class Aggregator:
 
         for dept_name, result in department_results.items():
             if not isinstance(result, dict):
+                self._log(f"Department {dept_name} returned non-dict result: {type(result)}", "WARNING")
                 continue
             if "error" in result:
+                self._log(f"Department {dept_name} returned error: {result['error']}", "WARNING")
                 continue
 
             assessments[dept_name] = result.get("assessment", "Unknown")
