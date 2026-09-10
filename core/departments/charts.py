@@ -1,129 +1,199 @@
 """
 AVCS VIRTUAL COMPANY
-CHARTS Dpt. — Contextual and Environmental Assessment
+CHARTS Dpt. — Structured Reality
 
 CONTRACT:
-PURPOSE: Provide environmental, geographic, spatial, and contextual constraints
-AUTHORITY: NONE
-PROHIBITED: Authorize maneuver, issue commands, determine final operational response
+PURPOSE: Establish and maintain an accurate, structured representation of operational reality.
+AUTHORITY: Fact Authority / Evidence Authority.
+PROHIBITED: Recommend actions, authorize maneuvers, interpret facts, predict the future.
 """
 
 from typing import Dict, Any, List
-from datetime import datetime
+from datetime import datetime, timezone
 from core.departments.base import BaseDepartment
 
 
 class ChartsDepartment(BaseDepartment):
     """
-    CHARTS Dpt. — Contextual and Environmental Assessment.
-    
-    Responsibilities:
-    - Determine geographic context
-    - Identify restricted or protected areas
-    - Identify relevant boundaries
-    - Identify known hazards
-    - Determine applicable spatial constraints
-    - Compare observed position against defined operational zones
+    CHARTS Dpt. — Structured Reality.
+
+    CHARTS does not recommend actions.
+    CHARTS does not authorize maneuvers.
+    CHARTS does not interpret facts.
+    CHARTS does not predict the future.
+
+    CHARTS establishes what is fact.
+
+    A chart is not an opinion.
+    A chart is a structured representation of reality.
     """
+
+    REALITY_CATEGORIES = {
+        "FACT": "observable, documented, verifiable",
+        "OBSERVATION": "what has been noticed",
+        "ASSUMPTION": "what is assumed",
+        "UNKNOWN": "what is not known",
+        "CONTRADICTION": "conflicting evidence",
+    }
 
     def __init__(self, config: Dict[str, Any] = None):
         super().__init__("CHARTS Dpt.", config)
-        self.authority_state = "NO_AUTHORITY"
+        self.authority_state = "FACT_AUTHORITY"
 
     def process(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Process incoming data and assess environmental context.
-        
+        Establish structured reality from incoming data.
+
         Required input fields:
-        - position: Position to assess
-        - context_type: Type of context (e.g., "maritime", "aviation", "land")
+        - facts: list of observed/verifiable facts (optional)
+        - observations: list of what has been noticed (optional)
+        - assumptions: list of what is assumed (optional)
+        - unknowns: list of what is not known (optional)
+        - contradictions: list of conflicting evidence (optional)
+
+        Returns:
+        - facts: established facts
+        - observations: documented observations
+        - assumptions: stated assumptions
+        - unknowns: identified unknowns
+        - contradictions: identified contradictions
+        - confidence: HIGH / MEDIUM / LOW
         """
-        # Validate input
-        required_fields = ["position"]
-        if not self._validate_input(input_data, required_fields):
-            self._log("Missing required fields in input", "WARNING")
-            return self._create_response(
-                assessment="INVALID INPUT — Missing required fields",
-                evidence=[],
-                confidence=0.0,
-                uncertainty=["Required fields: position"],
-                status="FAILED"
-            )
 
-        # Extract data
-        position = input_data.get("position", "unknown")
-        context_type = input_data.get("context_type", "general")
-        additional_info = input_data.get("additional_info", [])
+        facts = input_data.get("facts", [])
+        observations = input_data.get("observations", [])
+        assumptions = input_data.get("assumptions", [])
+        unknowns = input_data.get("unknowns", [])
+        contradictions = input_data.get("contradictions", [])
 
-        # Generate event ID if not provided
         self.event_id = input_data.get("event_id") or self._generate_event_id()
 
-        self._log(f"Processing context assessment for: {position} ({context_type})")
+        self._log(
+            f"CHARTS reality check — "
+            f"facts={len(facts)}, observations={len(observations)}, "
+            f"assumptions={len(assumptions)}, unknowns={len(unknowns)}, "
+            f"contradictions={len(contradictions)}"
+        )
 
-        # Build evidence
-        evidence = [
-            f"Position assessed: {position}",
-            f"Context type: {context_type}",
-            f"Assessment time: {datetime.utcnow().isoformat()}Z"
-        ]
-        if additional_info:
-            evidence.extend(additional_info)
+        # -------------------------------------------------------------------
+        # Structured reality assessment — fact discipline
+        # -------------------------------------------------------------------
 
-        # Determine restrictions
-        restrictions = []
-        hazards = []
-        if input_data.get("restricted_area"):
-            restrictions.append(f"Restricted area: {input_data.get('restricted_area')}")
-        if input_data.get("hazards"):
-            hazards = input_data.get("hazards", [])
+        evidence: List[str] = []
+        uncertainty: List[str] = []
 
-        # Build uncertainty
-        uncertainty = []
-        if not input_data.get("charts_reference"):
-            uncertainty.append("Chart reference not provided")
-        if not input_data.get("boundary_status"):
-            uncertainty.append("Boundary status not verified")
+        # Facts
+        if facts:
+            evidence.append(f"Facts established: {len(facts)}")
+            for fact in facts:
+                evidence.append(f"FACT: {fact}")
+        else:
+            uncertainty.append("No established facts provided")
 
-        # Build recommendations
-        recommendations = []
-        if restrictions:
-            recommendations.append(f"Avoid {restrictions[0] if restrictions else 'restricted areas'}")
-        if hazards:
-            recommendations.append(f"Note hazards: {', '.join(hazards)}")
-        if not recommendations:
-            recommendations.append("Continue with standard navigation")
+        # Observations
+        if observations:
+            evidence.append(f"Observations documented: {len(observations)}")
+            for obs in observations:
+                evidence.append(f"OBSERVATION: {obs}")
+
+        # Assumptions
+        if assumptions:
+            for asm in assumptions:
+                evidence.append(f"ASSUMPTION: {asm}")
+                uncertainty.append(f"Unverified assumption: {asm}")
+
+        # Unknowns
+        if unknowns:
+            for unk in unknowns:
+                evidence.append(f"UNKNOWN: {unk}")
+                uncertainty.append(f"Unknown: {unk}")
+
+        # Contradictions
+        if contradictions:
+            for con in contradictions:
+                evidence.append(f"CONTRADICTION: {con}")
+            uncertainty.append(
+                f"Contradictions detected: {len(contradictions)}"
+            )
+
+        # -------------------------------------------------------------------
+        # Determine reality status — structural, not interpretive
+        # -------------------------------------------------------------------
+
+        if contradictions:
+            reality_status = "CONTRADICTORY"
+            confidence = "LOW"
+            assessment = (
+                "CONTRADICTION — conflicting evidence detected: "
+                + "; ".join(contradictions)
+            )
+        elif not facts and not observations:
+            reality_status = "UNDETERMINED"
+            confidence = "LOW"
+            assessment = (
+                "UNDETERMINED — no facts or observations provided"
+            )
+        elif not facts:
+            reality_status = "PARTIAL"
+            confidence = "MEDIUM"
+            assessment = (
+                "PARTIAL — observations exist, no verified facts"
+            )
+        else:
+            reality_status = "STRUCTURED"
+            confidence = "HIGH"
+            assessment = (
+                f"STRUCTURED — {len(facts)} facts established, "
+                f"{len(unknowns)} unknowns, "
+                f"{len(assumptions)} assumptions"
+            )
+
+        # -------------------------------------------------------------------
+        # Response
+        # -------------------------------------------------------------------
 
         return self._create_response(
-            assessment=f"Context assessment completed: {position}",
+            assessment=assessment,
             evidence=evidence,
-            confidence=0.80 if restrictions or hazards else 0.90,
+            confidence=0.95 if confidence == "HIGH"
+                       else 0.75 if confidence == "MEDIUM"
+                       else 0.60,
             uncertainty=uncertainty,
-            constraints=restrictions,
-            recommendations=recommendations,
+            constraints=[],
+            recommendations=[],  # CHARTS does not recommend actions
             status="COMPLETED",
             event_id=self.event_id,
-            restrictions=restrictions,
-            hazards=hazards,
-            context_type=context_type
+            reality_status=reality_status,
+            facts=facts,
+            observations=observations,
+            assumptions=assumptions,
+            unknowns=unknowns,
+            contradictions=contradictions,
+            reality_confidence=confidence,
+            authority_state=self.authority_state,
         )
 
     def get_contract(self) -> Dict[str, Any]:
-        """Return the CHARTS Dpt. contract."""
+        """Return the CHARTS Dpt. contract — Structured Reality."""
         return {
             "department": self.department_name,
-            "purpose": "Provide environmental, geographic, spatial, and contextual constraints",
-            "authority": self.authority_state,
+            "purpose": "Establish and maintain an accurate, structured representation of operational reality.",
+            "authority": "FACT_AUTHORITY / EVIDENCE_AUTHORITY",
+            "question": "What do we actually know?",
+            "reality_categories": self.REALITY_CATEGORIES,
+            "permitted_outputs": [
+                "FACT",
+                "OBSERVATION",
+                "ASSUMPTION",
+                "UNKNOWN",
+                "CONTRADICTION",
+            ],
             "prohibited_decisions": [
-                "authorize maneuver",
+                "recommend actions",
+                "authorize maneuvers",
+                "interpret facts",
+                "predict the future",
                 "issue commands",
                 "determine final operational response",
-                "override another Department",
-                "suppress geographic constraints"
             ],
-            "permitted_recommendations": [
-                "maintaining separation",
-                "avoiding a restricted area",
-                "additional geographic verification",
-                "consideration of specific spatial constraints"
-            ]
         }
