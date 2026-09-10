@@ -1,142 +1,216 @@
 """
 AVCS VIRTUAL COMPANY
-GYRO Dpt. — Motion and Tracking Assessment
+GYRO Dpt. — Stability Under Pressure
 
 CONTRACT:
-PURPOSE: Establish movement, heading, tracking, trajectory, and motion-related evidence
-AUTHORITY: NONE
-PROHIBITED: Authorize maneuver, issue commands, determine final threat
+PURPOSE: Assess whether the decision environment is stable enough for legitimate action.
+AUTHORITY: Stability Assessment Authority.
+PROHIBITED: Recommend actions, authorize maneuvers, execute, issue commands.
 """
 
 from typing import Dict, Any, List
-from datetime import datetime
+from datetime import datetime, timezone
 from core.departments.base import BaseDepartment
 
 
 class GyroDepartment(BaseDepartment):
     """
-    GYRO Dpt. — Motion and Tracking Assessment.
-    
-    Responsibilities:
-    - Establish current heading
-    - Analyze movement
-    - Establish trajectory
-    - Identify changes in motion
-    - Calculate relevant movement parameters
-    - Detect deviations from expected movement
+    GYRO Dpt. — Stability Under Pressure.
+
+    GYRO does not analyze motion.
+    GYRO does not calculate trajectories.
+    GYRO does not recommend actions.
+
+    GYRO assesses whether the decision environment is stable enough
+    for legitimate action.
+
+    A gyroscope does not accelerate movement.
+    It prevents loss of balance.
     """
+
+    STABILITY_STATES = {
+        "STABLE": "environment supports legitimate action",
+        "CONDITIONALLY_STABLE": "environment supports action with constraints",
+        "UNSTABLE": "environment does not support legitimate action",
+        "UNDETERMINED": "stability cannot be assessed",
+    }
 
     def __init__(self, config: Dict[str, Any] = None):
         super().__init__("GYRO Dpt.", config)
-        self.authority_state = "NO_AUTHORITY"
+        self.authority_state = "STABILITY_ASSESSMENT_AUTHORITY"
 
     def process(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Process incoming data and assess motion/tracking.
-        
+        Assess whether the decision environment is stable enough for action.
+
         Required input fields:
-        - heading: Current heading (degrees)
-        - speed: Current speed (knots)
-        - position: Current position
+        - human_condition: cognitive/physical state of operators
+        - system_condition: operational state of the system
+        - load_level: current operational load (LOW / MEDIUM / HIGH)
+        - environmental_conditions: external conditions (optional)
+
+        Returns:
+        - stability_status: STABLE / CONDITIONALLY STABLE / UNSTABLE / UNDETERMINED
+        - load_level: HIGH / MEDIUM / LOW
+        - human_condition: assessment
+        - system_condition: assessment
+        - risk_factors: identified stability risks
+        - recommendation: MONITOR / ADJUST / HOLD / ESCALATE
         """
-        # Validate input
-        required_fields = ["heading", "speed", "position"]
-        if not self._validate_input(input_data, required_fields):
-            self._log("Missing required fields in input", "WARNING")
-            return self._create_response(
-                assessment="INVALID INPUT — Missing required fields",
-                evidence=[],
-                confidence=0.0,
-                uncertainty=["Required fields: heading, speed, position"],
-                status="FAILED"
-            )
 
-        # Extract data
-        heading = input_data.get("heading")
-        speed = input_data.get("speed")
-        position = input_data.get("position")
-        track_history = input_data.get("track_history", [])
+        human_condition = input_data.get("human_condition")
+        system_condition = input_data.get("system_condition")
+        load_level = input_data.get("load_level", "MEDIUM")
+        environmental_conditions = input_data.get("environmental_conditions", {})
 
-        # Generate event ID if not provided
         self.event_id = input_data.get("event_id") or self._generate_event_id()
 
-        self._log(f"Processing motion assessment: heading={heading}°, speed={speed} kts")
+        self._log(
+            f"GYRO stability assessment — load={load_level}, "
+            f"human={human_condition}, system={system_condition}"
+        )
 
-        # Build evidence
-        evidence = [
-            f"Current heading: {heading}°",
-            f"Current speed: {speed} knots",
-            f"Current position: {position}",
-            f"Assessment time: {datetime.utcnow().isoformat()}Z"
-        ]
-        if track_history:
-            evidence.append(f"Track history: {len(track_history)} points")
+        if not human_condition and not system_condition:
+            return self._create_response(
+                assessment="UNDETERMINED — no stability data provided",
+                evidence=[],
+                confidence=0.0,
+                uncertainty=["human_condition and system_condition are required"],
+                status="UNDETERMINED",
+                stability_status="UNDETERMINED",
+                load_level=load_level,
+                authority_state=self.authority_state,
+                event_id=self.event_id,
+            )
 
-        # Detect deviations
-        deviations = []
-        expected_heading = input_data.get("expected_heading")
-        expected_speed = input_data.get("expected_speed")
-        
-        if expected_heading and abs(heading - expected_heading) > 5:
-            deviations.append(f"Heading deviation: {heading - expected_heading}° from expected")
-        if expected_speed and abs(speed - expected_speed) > 2:
-            deviations.append(f"Speed deviation: {speed - expected_speed} kts from expected")
+        # -------------------------------------------------------------------
+        # Stability assessment — structural, not interpretive
+        # -------------------------------------------------------------------
 
-        # Build uncertainty
-        uncertainty = []
-        if not track_history:
-            uncertainty.append("No track history available")
-        if not input_data.get("trajectory"):
-            uncertainty.append("Trajectory not established")
+        evidence: List[str] = []
+        risk_factors: List[str] = []
+        uncertainty: List[str] = []
 
-        # Build recommendations
-        recommendations = []
-        if deviations:
-            recommendations.append(f"Verify: {', '.join(deviations)}")
-        if not track_history:
-            recommendations.append("Establish track history")
-        if not recommendations:
-            recommendations.append("Continue tracking")
+        # Human condition
+        if human_condition == "FATIGUED":
+            risk_factors.append("Human fatigue detected")
+            evidence.append("Human condition: FATIGUED")
+        elif human_condition == "OVERLOADED":
+            risk_factors.append("Human cognitive overload detected")
+            evidence.append("Human condition: OVERLOADED")
+        elif human_condition == "READY":
+            evidence.append("Human condition: READY")
+        else:
+            uncertainty.append("Human condition: UNKNOWN")
 
-        # Determine stability status
-        stability = "STABLE"
-        if deviations:
-            stability = "CONDITIONALLY STABLE"
-        if len(deviations) > 2:
-            stability = "UNSTABLE"
+        # System condition
+        if system_condition == "DEGRADED":
+            risk_factors.append("System degraded")
+            evidence.append("System condition: DEGRADED")
+        elif system_condition == "UNSTABLE":
+            risk_factors.append("System unstable")
+            evidence.append("System condition: UNSTABLE")
+        elif system_condition == "NOMINAL":
+            evidence.append("System condition: NOMINAL")
+        else:
+            uncertainty.append("System condition: UNKNOWN")
+
+        # Load level
+        if load_level == "HIGH":
+            risk_factors.append("Operational load HIGH")
+            evidence.append("Load level: HIGH")
+        elif load_level == "MEDIUM":
+            evidence.append("Load level: MEDIUM")
+        elif load_level == "LOW":
+            evidence.append("Load level: LOW")
+        else:
+            uncertainty.append("Load level: UNKNOWN")
+
+        # Environmental conditions
+        if environmental_conditions.get("hostile"):
+            risk_factors.append("Hostile environmental conditions")
+        if environmental_conditions.get("deteriorating"):
+            risk_factors.append("Deteriorating environmental conditions")
+
+        # -------------------------------------------------------------------
+        # Determine stability status — structural, not interpretive
+        # -------------------------------------------------------------------
+
+        if uncertainty and not risk_factors:
+            stability_status = "UNDETERMINED"
+            recommendation = "ESCALATE"
+            assessment = (
+                "UNDETERMINED — stability cannot be confirmed: "
+                + ", ".join(uncertainty)
+            )
+        elif len(risk_factors) >= 3:
+            stability_status = "UNSTABLE"
+            recommendation = "HOLD"
+            assessment = (
+                "UNSTABLE — environment does not support legitimate action: "
+                + ", ".join(risk_factors)
+            )
+        elif risk_factors:
+            stability_status = "CONDITIONALLY STABLE"
+            recommendation = "ADJUST"
+            assessment = (
+                "CONDITIONALLY STABLE — action possible with constraints: "
+                + ", ".join(risk_factors)
+            )
+        else:
+            stability_status = "STABLE"
+            recommendation = "MONITOR"
+            assessment = "STABLE — environment supports legitimate action"
+
+        # -------------------------------------------------------------------
+        # Response
+        # -------------------------------------------------------------------
 
         return self._create_response(
-            assessment=f"Motion assessment completed: heading={heading}°, speed={speed} kts",
+            assessment=assessment,
             evidence=evidence,
-            confidence=0.85 if not deviations else 0.70,
+            confidence=0.90 if stability_status == "STABLE"
+                       else 0.85 if stability_status == "UNSTABLE"
+                       else 0.70 if stability_status == "CONDITIONALLY STABLE"
+                       else 0.60,
             uncertainty=uncertainty,
-            constraints=[],
-            recommendations=recommendations,
+            constraints=risk_factors,
+            recommendations=[recommendation],  # GYRO recommends only stability action
             status="COMPLETED",
             event_id=self.event_id,
-            heading=heading,
-            speed=speed,
-            deviations=deviations,
-            stability=stability
+            stability_status=stability_status,
+            load_level=load_level,
+            human_condition=human_condition,
+            system_condition=system_condition,
+            risk_factors=risk_factors,
+            authority_state=self.authority_state,
         )
 
     def get_contract(self) -> Dict[str, Any]:
-        """Return the GYRO Dpt. contract."""
+        """Return the GYRO Dpt. contract — Stability Under Pressure."""
         return {
             "department": self.department_name,
-            "purpose": "Establish movement, heading, tracking, trajectory, and motion-related evidence",
-            "authority": self.authority_state,
-            "prohibited_decisions": [
-                "authorize maneuver",
-                "issue commands",
-                "determine final threat",
-                "authorize intervention",
-                "alter operational objectives"
+            "purpose": "Assess whether the decision environment is stable enough for legitimate action.",
+            "authority": "STABILITY_ASSESSMENT_AUTHORITY",
+            "question": "Is the environment stable enough to act?",
+            "stability_states": self.STABILITY_STATES,
+            "permitted_outputs": [
+                "STABLE",
+                "CONDITIONALLY STABLE",
+                "UNSTABLE",
+                "UNDETERMINED — ESCALATION REQUIRED",
             ],
             "permitted_recommendations": [
-                "continued tracking",
-                "trajectory monitoring",
-                "verification of unexpected movement",
-                "recalculation where data quality changes"
-            ]
+                "MONITOR",
+                "ADJUST",
+                "HOLD",
+                "ESCALATE",
+            ],
+            "prohibited_decisions": [
+                "recommend operational actions",
+                "authorize maneuvers",
+                "issue commands",
+                "execute",
+                "determine final threat",
+            ],
         }
