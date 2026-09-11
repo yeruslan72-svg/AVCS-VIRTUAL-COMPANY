@@ -1,6 +1,6 @@
 # AVCS VIRTUAL COMPANY
 
-### Constitution-Aligned Sequential Decision Architecture
+### Reference Implementation of the AVCS Decision Architecture
 
 **Version:** 0.5.2 — Constitution-Aligned Sequential
 **Status:** Active Development — Reference Implementation
@@ -8,77 +8,123 @@
 
 ---
 
-## 1. Overview
+## What This Is
 
-**AVCS VIRTUAL COMPANY** is an operational simulation of the AVCS decision architecture. It models how a high-risk organization can receive information, distribute analytical responsibility across functional departments, evaluate operational conditions, formulate decision proposals, control authority boundaries, execute approved actions, and preserve auditable decision records.
+**AVCS VIRTUAL COMPANY** is a working reference implementation of the AVCS decision architecture.
 
-The system is designed for environments where decisions must remain:
+It is not a demonstration. It is not a prototype for show.
 
-* structured,
-* traceable,
-* authority-controlled,
-* operationally executable,
-* conflict-aware,
-* and reviewable after the event.
+It is a **constitutionally-aligned system** that has been tested against its own governing principles — and passed.
 
-The Virtual Company is not a collection of independent AI agents.
+The Virtual Company models how a high-risk organization can:
 
-It is a **functional organization** in which each Department (Dpt.) operates within a defined responsibility and authority boundary — and in which the execution sequence itself is Constitution-aligned.
+- receive information,
+- normalize semantic meaning,
+- distribute analytical responsibility across seven functional departments,
+- evaluate operational conditions,
+- detect structural conflicts,
+- formulate decision proposals,
+- control authority boundaries,
+- execute approved actions,
+- preserve auditable decision records.
 
----
-
-## 2. Core Principle
-
-> **AI may analyze.
-> AI may recommend.
-> Authority must remain explicit.
-> Execution must be controlled.
-> The decision pathway must remain visible.**
-
-This principle is non-negotiable. It governs every component of the Virtual Company.
+It operates **sequentially**, not in parallel. Each department receives the structural state accumulated from previous departments. CAPTAIN is executed last, with full access to all results.
 
 ---
 
-## 3. Architecture
+## AVCS as a Discipline
 
-The current execution model is **sequential**, not parallel.
+AVCS is not only a machine. It is a **discipline** — a structural integrity system for decisions under pressure.
+
+The full AVCS documentation is in [`docs/`](docs/).
+
+**Start here:** [**System Navigator**](docs/System_Navigator.md) — the map of the entire AVCS discipline.
+
+The System Navigator shows:
+
+- how documents relate to one another,
+- in what order they should be read,
+- which document governs in which domain.
+
+### Core Documents
+
+| Document | Role |
+|---|---|
+| [**Charter**](docs/Charter.md) | Constitution — North of AVCS |
+| [**CORE**](docs/CORE.md) | 23 Laws of Structural Integrity |
+| [**Spirit Doctrine**](docs/Spirit_Doctrine.md) | Ethical and human-sovereignty foundation |
+| [**Code of Ethics**](docs/Code_of_Ethics.md) | Professional conduct |
+| [**Code of Practice**](docs/Code_of_Practice.md) | Technical standard for SIM audits |
+| [**Leadership Doctrine**](docs/Leadership_Doctrine.md) | Leadership principles |
+| [**Leadership Code**](docs/Leadership_Code.md) | Leadership behavior |
+| [**Manifest**](docs/Manifest.md) | Public identity |
+| [**Strategic Narrative**](docs/Strategic_Narrative.md) | Public positioning |
+
+### Operational Modules
+
+| Document | Role |
+|---|---|
+| [**SIM**](docs/SIM.md) | Structural Integrity Module — diagnostic instrument |
+| [**INS**](docs/INS.md) | Intelligence Navigation System |
+| [**HPSM**](docs/HPSM.md) | Human Performance Stability Model |
+| [**Execution Playbook**](docs/Execution_Playbook.md) | Operational enforcement standard |
+| [**Field Guide**](docs/Field_Guide.md) | Practical handbook for Practitioners |
+
+### Governance & Compliance
+
+| Document | Role |
+|---|---|
+| [**Practitioner Council Charter**](docs/Practitioner_Council_Charter.md) | Institutional governance |
+| [**Architecture Reconciliation**](docs/Architecture_Reconciliation.md) | Constitutional compliance test |
+
+### Virtual Company Internals
+
+| Document | Role |
+|---|---|
+| [**Decision Model**](docs/DECISION_MODEL.md) | Internal decision model |
+| [**Department Contracts**](docs/DEPARTMENT_CONTRACTS.md) | Department responsibility boundaries |
+| [**INS Architecture**](docs/INS_ARCHITECTURE.md) | Navigation architecture |
+
+---
+
+## Architecture
 
 ```text
 INCIDENT
-   │
-   ▼
+    │
+    ▼
 SEMANTIC EVENT NORMALIZER
-   │
-   ▼
+    │
+    ▼
 SEQUENTIAL EXECUTOR
-   │
-   ├──► LOOKOUT Dpt.     (foresight / signals)
-   ├──► CHARTS Dpt.      (structured reality)
-   ├──► GYRO Dpt.        (stability under pressure)
-   ├──► NAVIGATOR Dpt.   (strategy / direction)
-   ├──► COMPASS Dpt.     (North integrity / boundary authority)
-   ├──► HELM Dpt.        (decision authority)
-   └──► CAPTAIN Dpt.     (system integration / review)
-   │
-   ▼
+    │
+    ├──► LOOKOUT      (foresight / signals)
+    ├──► CHARTS       (structured reality)
+    ├──► GYRO         (stability under pressure)
+    ├──► NAVIGATOR    (strategy / direction)
+    ├──► COMPASS      (North integrity / boundary authority)
+    ├──► HELM         (decision authority)
+    └──► CAPTAIN      (system integration / review)
+    │
+    ▼
 AGGREGATION
-   │
-   ▼
+    │
+    ▼
 STRUCTURAL CONFLICT DETECTION
-   │
-   ▼
+    │
+    ▼
 DECISION PROPOSAL
-   │
-   ▼
+    │
+    ▼
 AUTHORITY GATE
-   │
-   ▼
+    │
+    ▼
 HUMAN AUTHORITY
-   │
-   ▼
+    │
+    ▼
 EXECUTION
-   │
-   ▼
+    │
+    ▼
 AVCS DECISION RECORD
 The architecture separates:
 
@@ -86,390 +132,7 @@ information → semantic normalization → sequential assessment → aggregation
 
 This separation is fundamental.
 
-4. Semantic Event Normalizer
-Before any department processes an incident, the Semantic Event Normalizer classifies the incoming text.
-
-It distinguishes between:
-
-ACTIVE — a condition is currently true
-
-UNCERTAIN — a condition is suspected, possible, or probable
-
-REPORTED — a condition has been reported but not confirmed
-
-CONFIRMED — a condition has been explicitly confirmed
-
-HISTORICAL — a condition belongs to a previous period
-
-NEGATIVE — a condition has been explicitly ruled out
-
-Each condition carries:
-
-severity (CRITICAL / HIGH / MEDIUM / LOW)
-
-semantic state
-
-confidence score
-
-polarity
-
-temporal context
-
-source
-
-Example:
-
-text
-"Water ingress suspected"  → UNCERTAIN (confidence 0.60)
-"Collision with vessel"    → ACTIVE    (confidence 0.80)
-"No injuries"              → NEGATIVE  (excluded from active conditions)
-This layer prevents the system from confusing the presence of a word with the presence of a condition.
-
-5. The Seven Departments (INS-A)
-Each department operates under a defined contract with explicit authority boundaries.
-
-LOOKOUT Dpt. — Foresight & Anticipation
-Detects weak signals, trends, and early deviation indicators.
-
-Question: What is changing?
-
-Authority: SIGNAL_AUTHORITY
-
-Prohibited: authorize, execute, determine final threat, suppress signals.
-
-CHARTS Dpt. — Structured Reality
-Establishes facts, observations, assumptions, unknowns, contradictions.
-
-Question: What do we actually know?
-
-Authority: FACT_AUTHORITY
-
-Prohibited: recommend actions, interpret facts, predict the future.
-
-GYRO Dpt. — Stability Under Pressure
-Assesses human condition, system condition, and operational load.
-
-Question: Is the environment stable enough to act?
-
-Authority: STABILITY_ASSESSMENT_AUTHORITY
-
-Prohibited: recommend operational actions, authorize maneuvers.
-
-NAVIGATOR Dpt. — Strategy & Direction
-Proposes strategic course and anticipates change.
-
-Question: Where should we go?
-
-Authority: STRATEGIC_PROPOSAL_AUTHORITY
-
-Prohibited: authorize action, execute, assess final threat.
-
-COMPASS Dpt. — North Integrity / Boundary Authority
-Determines whether a proposed decision remains within North.
-
-Question: Does this decision remain within North?
-
-Authority: BOUNDARY_AUTHORITY (veto on violation of North)
-
-Permitted outputs: WITHIN NORTH / OUTSIDE NORTH / UNDETERMINED
-
-Prohibited: recommend actions, calculate trajectories, execute, interpret North.
-
-North is not interpreted. North is applied.
-
-HELM Dpt. — Decision Authority
-Makes legitimate, bounded, structurally supported decisions.
-
-Question: What decision should be made?
-
-Authority: DECISION_AUTHORITY (within North)
-
-Permitted outputs: DECISION_MADE / NO_DECISION / DEFERRED / ESCALATED
-
-Prohibited: execute, issue commands, authorize own decision.
-
-CAPTAIN Dpt. — System Integration & Review
-Reviews whether the system remained structurally coherent.
-
-Question: Did the system remain structurally coherent?
-
-Authority: REVIEW_AUTHORITY
-
-Permitted outputs: INTACT / CONDITIONALLY INTACT / FRAGMENTED / BROKEN
-
-Prohibited: authorize, execute, replace human authority.
-
-A captain does not steer the ship. A captain ensures the ship remains a ship.
-
-6. Sequential Execution
-The Virtual Company executes departments sequentially, not in parallel.
-
-Why sequential?
-
-Because departments are functionally dependent:
-
-COMPASS requires the strategic intent from NAVIGATOR.
-
-HELM requires the North status from COMPASS, stability from GYRO, and reality from CHARTS.
-
-CAPTAIN requires the complete results from all six previous departments.
-
-Order:
-
-text
-1. LOOKOUT   → signal_state, trajectory
-2. CHARTS    → reality_status, facts
-3. GYRO      → stability_status, load_level
-4. NAVIGATOR → course, course_state
-5. COMPASS   → north_status, veto
-6. HELM      → decision, decision_state
-7. CAPTAIN   → structural_coherence, role_integrity
-CAPTAIN is executed last, with full access to department_results. It reviews the system, not the decision.
-
-7. Authority Boundary
-The Authority Gate establishes the boundary between:
-
-what the system recommends
-
-and
-
-what the organization authorizes.
-
-text
-DECISION PROPOSAL
-       │
-       ▼
-AUTHORITY GATE
-       │
-       ▼
-HUMAN AUTHORITY
-The system distinguishes between:
-
-information,
-
-analysis,
-
-recommendation,
-
-authorization,
-
-command,
-
-execution,
-
-result.
-
-Critical rule: Authorization may not override North.
-
-If COMPASS returns OUTSIDE NORTH or veto: true, the Authority Gate returns NORTH_VIOLATION — and no human authorization can proceed.
-
-North is not negotiable.
-
-8. Structural Conflict Detection
-Operational systems cannot assume that all departments will agree.
-
-Conflict is treated as a structural condition — not an error to be hidden.
-
-The Structural Conflict Detector identifies conflicts between structural fields, not text:
-
-North veto vs decision made
-
-Unstable environment vs decision made
-
-Contradictory reality vs decision made
-
-Course proposed vs outside North
-
-Deviation indicated vs intact coherence
-
-North integrity vs North status
-
-Role integrity broken
-
-Conflicts are preserved in the decision record. They are never silently removed during aggregation.
-
-9. Decision Proposal
-The Decision Engine converts the aggregated operational state into a structured Decision Proposal.
-
-A proposal contains:
-
-operational state (assessments from all departments)
-
-structural fields (north_status, stability_status, reality_status)
-
-evidence
-
-risks
-
-recommendations
-
-available options
-
-constraints
-
-conflicts
-
-authority requirement
-
-proposed action
-
-status
-
-The Decision Proposal is not equivalent to authorization.
-
-10. AVCS Decision Record
-Every completed decision cycle produces a structured AVCS record.
-
-The record preserves the full decision pathway — not merely the final state.
-
-text
-Event ID
-Timestamp
-Incoming Information
-Semantic Normalization
-Department Assessments (7)
-Aggregated State
-Structural Fields
-Conflict Result
-Decision Proposal
-Authority State
-Authorization
-Decision Record (final)
-Critical property: one event_id per cycle. Every department, every aggregation, every decision, every record — same ID.
-
-This makes the decision externally reviewable.
-
-11. Drift Detection (Self-Applied)
-AVCS was designed to detect drift — the silent normalization of small deviations.
-
-During development of the Virtual Company, AVCS applied this principle to itself.
-
-Four structural drifts were detected and resolved:
-
-Drift	Description	Resolution
-001	Implementation redefined the meaning of departmental roles (INS-B vs INS-A)	Roles restored to Constitution
-002	Implementation assumed a parallel execution model while Constitution required sequential	SequentialExecutor introduced
-003	Conflict detection checked text, not structure	Structural Conflict Detector implemented
-004	Sequential dependency incomplete (COMPASS, CAPTAIN not receiving accumulated state)	Order of execution corrected
-Two principles were established:
-
-Code must implement the Constitution — not redefine it.
-
-If implementation and Constitution diverge, the divergence becomes a test result — not an automatic Constitutional change.
-
-The Constitution was not modified. The implementation was reconciled.
-
-This is not a failure. This is validation.
-
-12. Test Scenario
-The current reference test is a collision incident.
-
-Input:
-
-text
-Collision with fishing vessel. A fishing vessel struck the port side
-of the cargo ship in the engine room area. Deep dent detected, water
-ingress suspected. No injuries. The vessel can continue its voyage.
-Position 35°N 45°W. The weather is calm.
-Object: Cargo ship
-Position: 35°N 45°W
-
-Expected output:
-
-text
-Semantic Normalizer:
-  COLLISION      → ACTIVE    (0.80)
-  HULL_BREACH    → UNCERTAIN (0.60)
-  FLOODING       → UNCERTAIN (0.60)
-
-Departments (INS-A):
-  LOOKOUT    → SIGNAL_DETECTED
-  CHARTS     → STRUCTURED
-  GYRO       → STABLE
-  NAVIGATOR  → MAINTAIN
-  COMPASS    → WITHIN NORTH (veto: false)
-  HELM       → DECISION_MADE (CONTINUE)
-  CAPTAIN    → INTACT (6 departments reviewed)
-
-Structural Fields:
-  North:     WITHIN NORTH
-  Veto:      NO
-  Stability: STABLE
-  Reality:   STRUCTURED
-  Coherence: INTACT
-  Decision:  DECISION_MADE
-
-Authority Gate:
-  authority_status: AWAITING_AUTHORITY
-
-After human approval:
-  status: AUTHORIZED
-13. Repository Structure
-text
-AVCS-VIRTUAL-COMPANY/
-│
-├── README.md
-├── requirements.txt
-├── .gitignore
-│
-├── app/
-│   ├── streamlit_app.py
-│   ├── logo.png
-│   └── north_is_not_negotiable.png
-│
-├── core/
-│   ├── __init__.py
-│   │
-│   ├── departments/
-│   │   ├── __init__.py
-│   │   ├── base.py
-│   │   ├── lookout.py
-│   │   ├── charts.py
-│   │   ├── gyro.py
-│   │   ├── navigator.py
-│   │   ├── compass.py
-│   │   ├── helm.py
-│   │   └── captain.py
-│   │
-│   ├── sequential_executor/
-│   │   ├── __init__.py
-│   │   └── sequential_executor.py
-│   │
-│   ├── aggregation/
-│   │   ├── __init__.py
-│   │   └── aggregator.py
-│   │
-│   ├── conflict_detection/
-│   │   ├── __init__.py
-│   │   └── conflict_detector.py
-│   │
-│   ├── decision_engine/
-│   │   ├── __init__.py
-│   │   └── decision_engine.py
-│   │
-│   ├── authority_gate/
-│   │   ├── __init__.py
-│   │   └── authority_gate.py
-│   │
-│   ├── state_machine/
-│   │   ├── __init__.py
-│   │   └── state_machine.py
-│   │
-│   ├── dispatcher/
-│   │   └── dispatcher.py    (legacy — not used in execution path)
-│   │
-│   ├── event_normalizer/
-│   ├── risk_engine/
-│   └── semantic_analyzer/
-│
-├── records/
-│   ├── __init__.py
-│   └── incident_registry.py
-│
-├── tests/
-│
-└── docs/
-14. Quick Start
+Quick Start
 Requirements:
 
 Python 3.10+
@@ -490,7 +153,138 @@ bash
 streamlit run app/streamlit_app.py
 Open the browser at http://localhost:8501.
 
-15. Development Status
+Test Scenario
+The reference test is a collision incident:
+
+text
+Collision with fishing vessel. A fishing vessel struck the port side
+of the cargo ship in the engine room area. Deep dent detected, water
+ingress suspected. No injuries. The vessel can continue its voyage.
+Position 35°N 45°W. The weather is calm.
+Expected output:
+
+Component	Expected
+Semantic Normalizer	COLLISION → ACTIVE; HULL_BREACH → UNCERTAIN; FLOODING → UNCERTAIN
+LOOKOUT	signal_state: SIGNAL_DETECTED
+CHARTS	reality_status: STRUCTURED
+GYRO	stability_status: STABLE
+NAVIGATOR	course_state: MAINTAIN
+COMPASS	north_status: WITHIN NORTH, veto: false
+HELM	decision_state: DECISION_MADE
+CAPTAIN	structural_coherence: INTACT
+Authority Gate	authority_status: AWAITING_AUTHORITY
+Record	decision cycle COMPLETED; authorization state recorded as AUTHORIZED
+Constitution-Aligned
+The Virtual Company is constitutionally aligned.
+
+Its architecture conforms to the AVCS Charter v1.1 and CORE v2.1.
+
+In September 2026, the Virtual Company was tested against its own governing documents. Four recorded areas of structural divergence were detected between implementation and Constitution. The Constitution remained unchanged. The implementation was reconciled.
+
+This is the first constitutional compliance test of AVCS on itself.
+
+Full record: Architecture Reconciliation.
+
+Self-Application
+AVCS is subject to the same structural integrity principles it imposes on systems it evaluates.
+
+This is not a claim. It is a structural property of the discipline.
+
+The Virtual Company does not merely demonstrate AVCS.
+
+It is the subject of AVCS structural integrity testing.
+
+The drift detected during development is not an unpleasant project error. It is the first real experiment of AVCS on itself.
+
+Core Principles
+Six immovable human truths from the Spirit Doctrine:
+
+Humans carry responsibility — not machines.
+
+Clarity beats complexity — always.
+
+Trust is engineered — not requested.
+
+Safety is intentional — not accidental.
+
+Decision power belongs to disciplined minds — not automated systems.
+
+Evidence precedes status — not the reverse.
+
+Five navigation principles from INS:
+
+North is not interpreted. North is applied.
+
+Recommendation is not authority.
+
+Analysis is not authorization.
+
+Capability is not permission.
+
+Evidence precedes status.
+
+The central diagnostic question of AVCS:
+
+Show me the condition behind the status.
+
+Repository Structure
+text
+AVCS-VIRTUAL-COMPANY/
+│
+├── README.md
+├── requirements.txt
+├── .gitignore
+│
+├── app/
+│   ├── streamlit_app.py
+│   ├── logo.png
+│   └── north_is_not_negotiable.png
+│
+├── core/
+│   ├── departments/
+│   │   ├── base.py
+│   │   ├── lookout.py
+│   │   ├── charts.py
+│   │   ├── gyro.py
+│   │   ├── navigator.py
+│   │   ├── compass.py
+│   │   ├── helm.py
+│   │   └── captain.py
+│   │
+│   ├── sequential_executor/
+│   ├── aggregation/
+│   ├── conflict_detection/
+│   ├── decision_engine/
+│   ├── authority_gate/
+│   └── state_machine/
+│
+├── records/
+│   └── incident_registry.py
+│
+├── docs/                              ← AVCS documentation (20 documents)
+│   ├── System_Navigator.md            ← Start here
+│   ├── Charter.md
+│   ├── CORE.md
+│   ├── Spirit_Doctrine.md
+│   ├── Code_of_Ethics.md
+│   ├── Code_of_Practice.md
+│   ├── Leadership_Doctrine.md
+│   ├── Leadership_Code.md
+│   ├── Manifest.md
+│   ├── Strategic_Narrative.md
+│   ├── SIM.md
+│   ├── INS.md
+│   ├── HPSM.md
+│   ├── Execution_Playbook.md
+│   ├── Field_Guide.md
+│   ├── Practitioner_Council_Charter.md
+│   ├── Architecture_Reconciliation.md
+│   ├── DECISION_MODEL.md
+│   ├── DEPARTMENT_CONTRACTS.md
+│   └── INS_ARCHITECTURE.md
+│
+└── tests/
+Status
 Current Version
 v0.5.2 — Constitution-Aligned Sequential
 
@@ -503,7 +297,7 @@ SequentialExecutor (Constitution-aligned order)
 
 Structural Conflict Detector
 
-Aggregator with risk_assessment
+Aggregator with risk assessment
 
 Decision Engine
 
@@ -532,60 +326,7 @@ Non-intervention case (Case L)
 
 These are future development stages.
 
-16. Relationship to AVCS
-AVCS VIRTUAL COMPANY is a reference implementation for testing AVCS structural concepts.
-
-The Virtual Company allows AVCS principles to be examined through executable operational scenarios — not documentation alone.
-
-The project is concerned with the transition:
-
-text
-REQUIREMENT
-     ↓
-OPERATIONAL CONDITION
-     ↓
-DECISION
-     ↓
-AUTHORITY
-     ↓
-ACTION
-     ↓
-VERIFIABLE RECORD
-The critical question is not only:
-
-Can an AI system recommend an action?
-
-The more important question is:
-
-Can the organizational architecture ensure that a critical requirement is converted into a controlled, authorized, executable, and reviewable operational action?
-
-17. Future Research Boundary
-The first implementation focuses on a completed intervention pathway.
-
-A more difficult structural problem will subsequently be tested:
-
-text
-A critical condition is detected.
-An intervention is possible.
-The operator decides NOT to intervene.
-The operation continues.
-Later, an external reviewer asks:
-
-  Was the non-intervention legitimate?
-  Can that legitimacy be demonstrated?
-  Can the state of non-action be externally verified?
-This is the Non-Intervention Decision Boundary (Case L).
-
-It represents a separate research boundary within AVCS. The positive-control implementation must precede the non-intervention case.
-
-18. Project Principle
-AI may analyze.
-AI may recommend.
-Authority must remain explicit.
-Execution must be controlled.
-The decision pathway must remain visible.
-
-19. Contact
+Contact
 Yeruslan Chihachyov
 Decision Architect for High-Risk Operations
 Founder — AVCS DNA MATRIX SPIRIT
@@ -594,8 +335,8 @@ LinkedIn: linkedin.com/in/yeruslan-chihachyov-70a807126
 
 Email: yeruslan72@gmail.com
 
-AVCS VIRTUAL COMPANY
-Adaptive Vector Control System
+AVCS — Adaptive Vector Control System
+Structural Integrity for Decisions Under Pressure
 
 From information to decision.
 From decision to controlled action.
