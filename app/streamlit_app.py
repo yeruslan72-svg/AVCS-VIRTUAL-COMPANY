@@ -687,9 +687,10 @@ with tab4:
     st.header("AVCS Decision Record")
 
     if st.session_state.current_step == "completed" or st.session_state.get("authorized") is not None:
-        st.success("Decision Cycle Completed — Authorized") if st.session_state.get("authorized") \
-            else st.info("Decision Cycle Completed — Rejected")
-
+    if st.session_state.get("authorized"):
+        st.success("Decision Cycle Completed — Authorized")
+    else:
+        st.info("Decision Cycle Completed — Rejected")
         record = {
             "event_id": st.session_state.event_id,
             "timestamp": datetime.now(timezone.utc).isoformat(),
