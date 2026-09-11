@@ -687,10 +687,11 @@ with tab4:
     st.header("AVCS Decision Record")
 
     if st.session_state.current_step == "completed" or st.session_state.get("authorized") is not None:
-    if st.session_state.get("authorized"):
-        st.success("Decision Cycle Completed — Authorized")
-    else:
-        st.info("Decision Cycle Completed — Rejected")
+        if st.session_state.get("authorized"):
+            st.success("Decision Cycle Completed — Authorized")
+        else:
+            st.info("Decision Cycle Completed — Rejected")
+
         record = {
             "event_id": st.session_state.event_id,
             "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -712,7 +713,6 @@ with tab4:
         )
     else:
         st.info("Complete the decision cycle to generate AVCS Record")
-
 # ===========================================================================
 # TAB 5: INCIDENT REGISTRY
 # ===========================================================================
