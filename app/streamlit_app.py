@@ -1,10 +1,10 @@
 """
 AVCS VIRTUAL COMPANY
 Streamlit UI — Operational Decision Dashboard
-Version: v0.5.0 — Constitution-Aligned Architecture
+Version: v0.5.1 — Constitution-Aligned Sequential Architecture
 
 ARCHITECTURE:
-INCIDENT → SEMANTIC STATE → DISPATCHER → 7 Dpts. (INS-A) →
+INCIDENT → SEMANTIC STATE → SEQUENTIAL EXECUTOR → 7 Dpts. (INS-A) →
 AGGREGATION → CONFLICT → DECISION → AUTHORITY → RECORD
 """
 
@@ -29,7 +29,7 @@ from core.departments import (
     HelmDepartment,
     CaptainDepartment,
 )
-from core.dispatcher import Dispatcher
+from core.sequential_executor import SequentialExecutor
 from core.aggregation import Aggregator
 from core.conflict_detection import ConflictDetector
 from core.decision_engine import DecisionEngine
@@ -280,7 +280,7 @@ class SemanticEventNormalizer:
 
 
 # ===========================================================================
-# STREAMLIT UI — v0.5.0 Constitution-Aligned
+# STREAMLIT UI — v0.5.1 Constitution-Aligned Sequential
 # ===========================================================================
 
 st.set_page_config(page_title="AVCS Virtual Company", page_icon="🧭", layout="wide")
@@ -321,7 +321,7 @@ if not st.session_state.welcome_shown:
     st.stop()
 
 st.title("🧭 AVCS VIRTUAL COMPANY")
-st.caption("AI-Driven Operational Decision Architecture — v0.5.0 Constitution-Aligned")
+st.caption("AI-Driven Operational Decision Architecture — v0.5.1 Constitution-Aligned Sequential")
 
 # --- SESSION INIT ---
 defaults = {
@@ -329,7 +329,6 @@ defaults = {
     "event_id": None,
     "current_step": "input",
     "event_data": None,
-    "dispatcher_results": None,
     "department_results": None,
     "aggregated_state": None,
     "conflict_result": None,
@@ -361,12 +360,12 @@ with st.sidebar:
     st.write(f"Step: {st.session_state.current_step}")
     st.divider()
     st.header("Architecture")
-    st.caption("INCIDENT → SEMANTIC → DISPATCHER → 7 Dpts. (INS-A) → AGGREGATION → CONFLICT → DECISION → AUTHORITY → RECORD")
+    st.caption("INCIDENT → SEMANTIC → SEQUENTIAL EXECUTOR → 7 Dpts. (INS-A) → AGGREGATION → CONFLICT → DECISION → AUTHORITY → RECORD")
     st.divider()
-    st.caption("Version: 0.5.0")
+    st.caption("Version: 0.5.1")
 
     if st.button("🔄 Reset Event", use_container_width=True):
-        for key in ["event_id", "event_data", "dispatcher_results", "department_results",
+        for key in ["event_id", "event_data", "department_results",
                     "aggregated_state", "conflict_result", "decision_proposal",
                     "authority_state", "authorized", "current_step"]:
             if key in st.session_state:
@@ -459,129 +458,96 @@ with tab1:
                 st.json(st.session_state.event_data["critical_conditions"])
 
 # ===========================================================================
-# TAB 2: PROCESSING
+# TAB 2: PROCESSING — SEQUENTIAL EXECUTION (v0.5.1)
 # ===========================================================================
 
 with tab2:
     st.header("Processing Pipeline")
+    st.caption("Sequential execution — Constitution-aligned (v0.5.1)")
 
     if st.session_state.current_step == "processing" and st.session_state.event_data:
-        with st.spinner("Processing incident..."):
-            # Create departments
-            lookout = LookoutDepartment()
-            charts = ChartsDepartment()
-            gyro = GyroDepartment()
-            navigator = NavigatorDepartment()
-            compass = CompassDepartment()
-            helm = HelmDepartment()
-            captain = CaptainDepartment()
+        with st.spinner("Processing incident (sequential)..."):
+            # ---------------------------------------------------------------
+            # Initialize departments IN ORDER
+            # ---------------------------------------------------------------
+            departments = [
+                LookoutDepartment(),
+                ChartsDepartment(),
+                GyroDepartment(),
+                NavigatorDepartment(),
+                CompassDepartment(),
+                HelmDepartment(),
+                CaptainDepartment(),
+            ]
 
-            # Dispatcher
-            dispatcher = Dispatcher()
-            for d in [lookout, charts, gyro, navigator, compass, helm, captain]:
-                dispatcher.register_department(d)
-
+            # ---------------------------------------------------------------
+            # Initialize components
+            # ---------------------------------------------------------------
+            state_machine = StateMachine()
             aggregator = Aggregator()
             conflict_detector = ConflictDetector()
             decision_engine = DecisionEngine()
             authority_gate = AuthorityGate()
-            state_machine = StateMachine()
 
+            # ---------------------------------------------------------------
+            # Initialize SequentialExecutor
+            # ---------------------------------------------------------------
+            executor = SequentialExecutor(
+                departments=departments,
+                state_machine=state_machine,
+                aggregator=aggregator,
+                conflict_detector=conflict_detector,
+                decision_engine=decision_engine,
+                authority_gate=authority_gate,
+            )
+
+            # ---------------------------------------------------------------
+            # Prepare event data
+            # ---------------------------------------------------------------
             event_data = st.session_state.event_data.copy()
 
-            # Build input per INS-A
-            event_data["situation"] = event_data.get("description", "Incident detected")
-            event_data["time_to_event"] = 5
-            event_data["action"] = "Analyze and respond"
-
-            # LOOKOUT: foresight inputs
             event_data["observations"] = event_data.get("critical_conditions", [])
-            event_data["trends"] = []
-            event_data["deviations"] = []
-            event_data["context"] = {"object": event_data.get("object"), "position": event_data.get("position")}
-
-            # CHARTS: structured reality
-            event_data["facts"] = [f"Object: {event_data.get('object')}", f"Position: {event_data.get('position')}"]
-            event_data["assumptions"] = []
-            event_data["unknowns"] = []
-            event_data["contradictions"] = []
-
-            # GYRO: stability
-            event_data["human_condition"] = "READY"
-            event_data["system_condition"] = "NOMINAL"
-            event_data["load_level"] = "MEDIUM"
-            event_data["environmental_conditions"] = {}
-
-            # NAVIGATOR: strategy
-            event_data["current_state"] = {"event_type": event_data.get("event_type"), "severity": event_data.get("severity")}
-            event_data["strategic_context"] = {}
-            event_data["anticipated_changes"] = []
-
-            # COMPASS: North check
+            event_data["facts"] = [
+                f"Object: {event_data.get('object')}",
+                f"Position: {event_data.get('position')}",
+            ]
             event_data["operational_state"] = {
                 "structural_integrity": True,
                 "human_safety": True,
                 "operational_control": True,
             }
-            event_data["decision_proposal"] = event_data.get("decision_proposal", "Awaiting assessment")
+            event_data["human_condition"] = "READY"
+            event_data["system_condition"] = "NOMINAL"
+            event_data["load_level"] = "MEDIUM"
+            event_data["current_state"] = {
+                "event_type": event_data.get("event_type"),
+                "severity": event_data.get("severity"),
+            }
 
-            # HELM: decision inputs (populated after COMPASS/GYRO/CHARTS)
-            # CAPTAIN: review inputs (populated after HELM)
+            # ---------------------------------------------------------------
+            # Execute sequentially
+            # ---------------------------------------------------------------
+            result = executor.execute(event_data)
 
-            state_machine.start(st.session_state.event_id)
-            state_machine.dispatch()
-            dispatcher_results = dispatcher.process_incoming_event(event_data)
-
-            state_machine.process()
-            task_packets = dispatcher_results.get("task_packets", [])
-            department_results = {}
-
-            for packet in task_packets:
-                dept_name = packet["department"]
-                dept_data = packet["data"]
-
-                if dept_name == "LOOKOUT Dpt.":
-                    department_results[dept_name] = lookout.process(dept_data)
-                elif dept_name == "CHARTS Dpt.":
-                    department_results[dept_name] = charts.process(dept_data)
-                elif dept_name == "GYRO Dpt.":
-                    department_results[dept_name] = gyro.process(dept_data)
-                elif dept_name == "NAVIGATOR Dpt.":
-                    department_results[dept_name] = navigator.process(dept_data)
-                elif dept_name == "COMPASS Dpt.":
-                    department_results[dept_name] = compass.process(dept_data)
-                elif dept_name == "HELM Dpt.":
-                    department_results[dept_name] = helm.process(dept_data)
-                elif dept_name == "CAPTAIN Dpt.":
-                    department_results[dept_name] = captain.process(dept_data)
-                else:
-                    department_results[dept_name] = {"error": f"Unknown department: {dept_name}"}
-
-            state_machine.aggregate()
-            aggregated_state = aggregator.aggregate(department_results, st.session_state.event_id)
-
-            state_machine.detect_conflicts()
-            conflict_result = conflict_detector.detect(aggregated_state)
-
-            state_machine.formulate_decision()
-            decision_proposal = decision_engine.formulate(aggregated_state, conflict_result)
-
-            state_machine.wait_for_authority()
-            authority_state = authority_gate.present_decision(decision_proposal)
-
-            st.session_state.dispatcher_results = dispatcher_results
-            st.session_state.department_results = department_results
-            st.session_state.aggregated_state = aggregated_state
-            st.session_state.conflict_result = conflict_result
-            st.session_state.decision_proposal = decision_proposal
-            st.session_state.authority_state = authority_state
+            # ---------------------------------------------------------------
+            # Store results
+            # ---------------------------------------------------------------
+            st.session_state.department_results = result["department_results"]
+            st.session_state.aggregated_state = result["aggregated_state"]
+            st.session_state.conflict_result = result["conflict_result"]
+            st.session_state.decision_proposal = result["decision_proposal"]
+            st.session_state.authority_state = result["authority_state"]
+            st.session_state.event_id = result["event_id"]
             st.session_state.current_step = "authority"
 
+            # ---------------------------------------------------------------
+            # Update registry
+            # ---------------------------------------------------------------
             registry = IncidentRegistry()
             registry.update_incident(
                 st.session_state.event_id,
                 {
-                    "decision_proposal": decision_proposal,
+                    "decision_proposal": result["decision_proposal"],
                     "authorized": False,
                     "status": "AWAITING_AUTHORITY",
                 },
@@ -589,24 +555,30 @@ with tab2:
 
             st.rerun()
 
-    # Display department results
+    # ---------------------------------------------------------------
+    # Display: Department Results (INS-A)
+    # ---------------------------------------------------------------
     if st.session_state.get("department_results"):
-        st.subheader("Department Assessments (INS-A)")
+        st.subheader("Department Assessments (INS-A — Sequential)")
         for dept, result in st.session_state.department_results.items():
             with st.expander(f"📋 {dept}"):
                 if isinstance(result, dict) and "error" in result:
                     st.error(result["error"])
+                elif isinstance(result, dict) and result.get("status") == "FAILED":
+                    st.error(result.get("assessment", "FAILED"))
+                    st.json(result)
                 else:
                     st.json(result)
 
-    # Display aggregated state
+    # ---------------------------------------------------------------
+    # Display: Aggregated State + Structural Fields
+    # ---------------------------------------------------------------
     if st.session_state.get("aggregated_state"):
         st.subheader("📊 Aggregated State")
-        st.json(st.session_state.aggregated_state)
 
         structural = st.session_state.aggregated_state.get("structural", {})
         if structural:
-            st.subheader("🧭 Structural Fields (INS-A)")
+            st.markdown("### 🧭 Structural Fields (INS-A)")
             col1, col2, col3 = st.columns(3)
             with col1:
                 st.metric("North", structural.get("north_status", "—"))
@@ -617,16 +589,48 @@ with tab2:
             with col3:
                 st.metric("Reality", structural.get("reality_status", "—"))
                 st.metric("Coherence", structural.get("structural_coherence", "—"))
-            st.json(structural)
 
-    # Display conflicts
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("Signal", structural.get("signal_state", "—"))
+            with col2:
+                st.metric("Course", structural.get("course_state", "—"))
+            with col3:
+                st.metric("Decision", structural.get("decision_state", "—"))
+
+            with st.expander("Full Structural State"):
+                st.json(structural)
+
+        with st.expander("Full Aggregated State"):
+            st.json(st.session_state.aggregated_state)
+
+    # ---------------------------------------------------------------
+    # Display: Conflict Detection
+    # ---------------------------------------------------------------
     if st.session_state.get("conflict_result"):
         st.subheader("⚠️ Conflict Detection")
-        if st.session_state.conflict_result.get("has_conflicts"):
-            st.warning("Conflicts detected!")
+        cr = st.session_state.conflict_result
+
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("Has Conflicts", "YES" if cr.get("has_conflicts") else "NO")
+        with col2:
+            st.metric("Conflict Type", cr.get("conflict_type", "NONE"))
+        with col3:
+            st.metric("Decision Blocked", "YES" if cr.get("decision_blocked") else "NO")
+
+        if cr.get("has_conflicts"):
+            st.warning(f"{len(cr.get('conflicts', []))} conflict(s) detected")
+            for c in cr.get("conflicts", []):
+                st.markdown(
+                    f"- **{c.get('type')}** ({c.get('severity')}): "
+                    f"{c.get('description')}"
+                )
         else:
-            st.success("No conflicts detected")
-        st.json(st.session_state.conflict_result)
+            st.success("No structural conflicts detected")
+
+        with st.expander("Full Conflict Result"):
+            st.json(cr)
 
 # ===========================================================================
 # TAB 3: DECISION
