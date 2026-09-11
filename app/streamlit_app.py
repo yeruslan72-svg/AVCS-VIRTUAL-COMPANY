@@ -1,7 +1,7 @@
 """
 AVCS VIRTUAL COMPANY
 Streamlit UI — Operational Decision Dashboard
-Version: v0.5.1 — Constitution-Aligned Sequential Architecture
+Version: v0.5.2 — Constitution-Aligned Sequential 
 
 ARCHITECTURE:
 INCIDENT → SEMANTIC STATE → SEQUENTIAL EXECUTOR → 7 Dpts. (INS-A) →
@@ -321,7 +321,7 @@ if not st.session_state.welcome_shown:
     st.stop()
 
 st.title("🧭 AVCS VIRTUAL COMPANY")
-st.caption("AI-Driven Operational Decision Architecture — v0.5.1 Constitution-Aligned Sequential")
+st.caption("AI-Driven Operational Decision Architecture — v0.5.2 Constitution-Aligned Sequential")
 
 # --- SESSION INIT ---
 defaults = {
@@ -362,7 +362,7 @@ with st.sidebar:
     st.header("Architecture")
     st.caption("INCIDENT → SEMANTIC → SEQUENTIAL EXECUTOR → 7 Dpts. (INS-A) → AGGREGATION → CONFLICT → DECISION → AUTHORITY → RECORD")
     st.divider()
-    st.caption("Version: 0.5.1")
+    st.caption("Version: 0.5.2")
 
     if st.button("🔄 Reset Event", use_container_width=True):
         for key in ["event_id", "event_data", "department_results",
@@ -463,7 +463,7 @@ with tab1:
 
 with tab2:
     st.header("Processing Pipeline")
-    st.caption("Sequential execution — Constitution-aligned (v0.5.1)")
+    st.caption("Sequential execution — Constitution-aligned (v0.5.2)")
 
     if st.session_state.current_step == "processing" and st.session_state.event_data:
         with st.spinner("Processing incident (sequential)..."):
