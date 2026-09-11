@@ -22,13 +22,38 @@ The laws are numbered but not ordered by priority. Each is foundational.
 
 ---
 
-## 1. PURPOSE
+## STRUCTURE OF THE 23 LAWS
+
+The 23 Laws are organized into four structural levels:
+
+### I — CONTROL (Laws 1–5)
+What control is, and how it is lost.
+
+### II — NORTH & AUTHORITY (Laws 6–8, 12–13, 18–20)
+Where boundaries are, who holds authority, and what AVCS does not do.
+
+### III — STRUCTURAL CONDITIONS (Laws 9–11, 14–17)
+What conditions must exist for control to hold.
+
+### IV — EVIDENCE & GOVERNANCE (Laws 21–23)
+How to prove that conditions existed, and how to control AVCS implementation itself.
+
+**Level IV is the most recent addition to AVCS. It is also, structurally, the most consequential.**
+
+Because without evidence, control is a claim.
+Without governance of implementation, the Constitution is a document.
+
+---
+
+## LEVEL I — CONTROL
+
+### 1. PURPOSE
 
 Any system can be interrupted before it becomes uncontrollable.
 
 ---
 
-## 2. CORE PRINCIPLE
+### 2. CORE PRINCIPLE
 
 **Control = the ability to stop in time.**
 
@@ -36,7 +61,7 @@ If a system cannot be stopped, it is not under control.
 
 ---
 
-## 3. THE FAILURE CONDITION
+### 3. THE FAILURE CONDITION
 
 Systems do not fail when something breaks.
 
@@ -51,7 +76,7 @@ They fail when:
 
 ---
 
-## 4. RED ZONE LAW
+### 4. RED ZONE LAW
 
 If stopping is uncertain → continuation is prohibited.
 
@@ -59,7 +84,7 @@ This is non-negotiable.
 
 ---
 
-## 5. INTEGRITY EQUATION
+### 5. INTEGRITY EQUATION
 
 **Integrity = STOP × North × Field**
 
@@ -71,17 +96,21 @@ All three are required. Loss of any one is sufficient for collapse.
 
 ---
 
-## 6. NORTH IS GUARDED
+## LEVEL II — NORTH & AUTHORITY
 
-The Compass function has **veto authority** over any decision that violates North.
+### 6. NORTH IS GUARDED
 
-It does not manage operations. It overrides them when necessary.
+The Compass function **guards North**.
+
+It may **reject continuation** when the governing boundary is outside North, or when the boundary cannot be established as sufficiently determinate and authoritative.
+
+It does not select operational strategy. It does not execute operational decisions. It does not interpret North.
 
 North is not interpreted. North is applied.
 
 ---
 
-## 7. WHAT AVCS IS
+### 7. WHAT AVCS IS
 
 AVCS is a structural control system for decision integrity under pressure.
 
@@ -93,7 +122,7 @@ It examines whether the architecture surrounding critical decisions is structura
 
 ---
 
-## 8. SYSTEM ARCHITECTURE
+### 8. SYSTEM ARCHITECTURE
 
 AVCS operates through four complementary modules:
 
@@ -111,6 +140,36 @@ These modules are not optional. Absence of any one results in loss of control.
 
 Diagnostic application may begin with SIM and expand as needed. Full operational architecture requires all four.
 
+12. OPERATIONAL LAW
+No action is allowed if the system cannot be safely stopped.
+
+13. HUMAN ROLE
+Humans are the last authority to interrupt — only if interruption remains structurally possible.
+
+If interruption is not structurally possible, the human is not the last authority. The system is.
+
+18. POSITION
+AVCS determines whether systems are controllable.
+
+It does not determine whether a specific operation is safe.
+
+It does not replace engineering judgment, regulatory oversight, or operational authority.
+
+19. FINAL DOCTRINE
+If you cannot stop — you do not control.
+
+20. AUTHORITY
+AVCS does not recommend. AVCS determines.
+
+But the determination is structural, not operational.
+
+AVCS determines structural admissibility — not operational choice.
+
+AVCS may determine that a continuation path is structurally inadmissible. It does not determine which alternative operational action must be selected.
+
+Authorization remains human. Recommendation is not authority. Analysis is not authorization. Capability is not permission.
+
+LEVEL III — STRUCTURAL CONDITIONS
 9. CONTROL IS NOT PERFORMANCE
 Performance ≠ Control.
 
@@ -131,9 +190,11 @@ Overrides are transparent — deviations are visible, logged, traceable.
 
 Drift is detected — the accumulation of small deviations is tracked.
 
-North is determinate — the boundary is applicable, not contested.
+North is determinate — the governing boundary is identifiable, authoritative, and applicable to the affected operation.
 
 Authority is explicit — recommendation is not authorization.
+
+Where the governing boundary is materially contested or indeterminate, continuation cannot rely on an unresolved interpretation.
 
 If any condition fails, the system is not under control.
 
@@ -152,24 +213,14 @@ Stopping becomes uncertain.
 
 Loss of control precedes visible failure.
 
-Failure becomes inevitable.
+The system enters a state in which prevention is no longer reliably controllable.
 
 Each step reduces corrective reachability. After the final step, only consequence management remains.
 
-12. OPERATIONAL LAW
-No action is allowed if the system cannot be safely stopped.
-
-13. HUMAN ROLE
-Humans are the last authority to interrupt — only if interruption remains structurally possible.
-
-If interruption is not structurally possible, the human is not the last authority. The system is.
-
 14. WHAT AVCS MEASURES
-Only control.
+AVCS measures structural conditions of control.
 
-Not performance. Not outcomes. Not compliance.
-
-AVCS measures whether a system is structurally capable of stopping, escalating, and authorizing.
+It does not score operational performance, business performance, or outcomes as measures of control.
 
 15. OUTPUT
 AVCS produces:
@@ -178,7 +229,7 @@ Structural Integrity Score (0–25)
 
 Navigation Integrity Score (0–25)
 
-Human Performance Stability Score (0–20)
+Human Performance Stability Score (0–20) — as a supporting structural condition
 
 System-level control actions
 
@@ -204,27 +255,7 @@ Implementation — restoration of structural integrity through the Execution Pla
 
 Each stage produces a record. Records are preserved across stages.
 
-18. POSITION
-AVCS determines whether systems are controllable.
-
-It does not determine whether a specific operation is safe.
-
-It does not replace engineering judgment, regulatory oversight, or operational authority.
-
-19. FINAL DOCTRINE
-If you cannot stop — you do not control.
-
-20. AUTHORITY
-AVCS does not recommend. AVCS determines.
-
-But the determination is structural, not operational.
-
-AVCS determines the conditions under which a decision can be legitimately authorized.
-
-Authorization remains human.
-
-Recommendation is not authority. Analysis is not authorization. Capability is not permission.
-
+LEVEL IV — EVIDENCE & GOVERNANCE
 21. STATUS IS NOT A STRUCTURAL CONDITION
 A claimed status — Protected, Authorized, Controlled, Within North, Closed — is not evidence of a structural condition.
 
@@ -268,8 +299,24 @@ Not a silent redefinition.
 
 Not an operational convenience.
 
-The Constitution remains unchanged. The implementation is reconciled.
+The Constitution remains unchanged.
 
+The implementation is treated as non-conforming until formally reconciled.
+
+Divergence is recorded. Reconciliation is documented. The record is preserved.
+
+text
+Constitution
+     ↓
+Implementation
+     ↓
+Divergence detected
+     ↓
+Test result
+     ↓
+Non-conforming state
+     ↓
+Formal reconciliation
 FINAL STATEMENT
 Continuation without control is a managed risk — not a controlled one.
 
