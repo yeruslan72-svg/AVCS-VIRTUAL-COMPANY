@@ -27,6 +27,10 @@ The test conditions were frozen before adjudication. Neither Charter nor CORE wa
 
 Where divergence was found, the implementation was treated as **non-conforming** until formally reconciled.
 
+**The test does not constitute external validation of AVCS.**
+
+**It constitutes evidence of self-application** — AVCS detected, recorded, and reconciled structural divergence within its own implementation using its own governing principles.
+
 ---
 
 ## 1. CONTEXT
@@ -35,7 +39,15 @@ The AVCS Virtual Company was developed as a working implementation of the AVCS d
 
 During development, the implementation began to diverge from the normative definitions in the Charter and CORE.
 
-This divergence was not deliberate. It was not a coding error. It was **drift** — the gradual normalization of small architectural deviations, exactly the failure mode AVCS is designed to detect.
+This divergence was not deliberate.
+
+It was not treated as an isolated coding defect.
+
+It was **drift** — the gradual normalization of small architectural deviations, exactly the failure mode AVCS is designed to detect.
+
+The implementation could be technically functional but **architecturally non-conforming** to the Constitution.
+
+This distinction matters. A system may produce expected outputs while operating under an architecture that violates its governing principles. Functional success does not imply structural conformity.
 
 This document records the first formal case in which AVCS detected structural drift **within itself**.
 
@@ -81,29 +93,35 @@ The implementation redefined the meaning of several departmental roles.
 - 🔴 Non-conforming — implementation changes the normative meaning of the role.
 - 🟡 Partially conforming — implementation extends the role without violating it.
 
-### Drift 002 — Parallel Execution Model
+### Drift 002 — Execution Model
 
-**Charter v1.1 / CORE v2.1:** Sequential dependency between departments.
+**Constitutional requirement tested:** sequential dependency and state accumulation between INS functions.
 
-**Implementation v0.4.1:** Parallel fan-out via Dispatcher.
+**Implementation v0.4.1:** parallel fan-out via Dispatcher.
 
 Each department received the same input, with no accumulation of state. This violated the functional dependency between departments (e.g., COMPASS requires strategic intent from NAVIGATOR; HELM requires North status from COMPASS).
 
+The test examined not merely parallel vs sequential execution, but whether downstream functions receive the **structural state required by their constitutional role**.
+
 **Status:** 🔴 Non-conforming.
 
-### Drift 003 — Text-Based Conflict Detection
+### Drift 003 — Conflict Detection
 
-**Charter v1.1 / CORE v2.1:** Structural conflict detection — conflicts identified between structural fields.
+**Constitutional requirement tested:** structural conflict detection between departmental outputs.
 
-**Implementation v0.4.1:** Text-based conflict detection — conflicts identified by matching strings in departmental assessment text.
+**Implementation v0.4.1:** text-based conflict detection — conflicts identified by matching strings in departmental assessment text.
+
+This violated the structural principle that conflict is a **structural condition**, not a textual pattern.
 
 **Status:** 🔴 Non-conforming.
 
 ### Drift 004 — Incomplete Sequential Dependency
 
-**Charter v1.1 / CORE v2.1:** Full sequential dependency with state accumulation.
+**Constitutional requirement tested:** full sequential dependency with state accumulation.
 
 **Implementation v0.4.1:** COMPASS and CAPTAIN not receiving accumulated state from previous departments.
+
+This resulted in downstream departments operating with incomplete structural inputs.
 
 **Status:** 🔴 Non-conforming.
 
@@ -141,8 +159,20 @@ COMPASS	north_status: WITHIN NORTH, veto: false
 HELM	decision_state: DECISION_MADE
 CAPTAIN	structural_coherence: INTACT
 Authority Gate	authority_status: AWAITING_AUTHORITY
-Record	status: COMPLETED, authorized: true
-Result: All components produced expected output. The full decision cycle completed successfully.
+Record	decision cycle COMPLETED; authorization state recorded as AUTHORIZED
+Result:
+
+All tested components produced the expected constitutional outputs, in the prescribed dependency order, and the full decision cycle completed successfully.
+
+On the Record:
+
+Authorization and completion are distinct structural states. The record preserves both:
+
+Authorization — a human authority state, recorded at the moment it was given.
+
+Completion — the state of the decision cycle, recorded after all structural stages were performed.
+
+Completion does not imply authorization, and authorization does not imply execution.
 
 6. PRINCIPLES ESTABLISHED
 Two foundational principles were established from this test:
@@ -170,36 +200,54 @@ Layer	Protection	Document
 2	Structural	CORE v2.1
 3	Professional	Code of Ethics v1.1
 4	Evidentiary	Evidence Before Status / Ex Ante
-5	Compliance	Architecture Reconciliation
-The fifth layer is the most consequential because it makes AVCS self-applicable. AVCS does not merely describe structural integrity. It applies the same test to its own implementation.
+5	Self-Application	Architecture Reconciliation
+The fifth layer establishes AVCS self-application: the architecture is subject to the same structural integrity principles that it imposes on implementations it evaluates.
+
+This is not merely a compliance mechanism. It is a structural property of the doctrine:
+
+text
+AVCS evaluates systems
+        ↓
+AVCS evaluates itself
+        ↓
+The doctrine contains a self-application mechanism
+AVCS does not merely describe structural integrity. It is capable of applying the same test to its own implementation.
 
 8. STATUS
 Document	Status
 Charter v1.1	Unchanged
 CORE v2.1	Unchanged
 Code of Ethics v1.1	Unchanged
-Implementation v0.5.2	Conforming
+Implementation v0.5.2	Conforming to tested constitutional requirements
 Divergence: Recorded.
 Reconciliation: Documented.
 Record: Preserved.
 
 This is the first constitutional compliance test of AVCS on itself.
 
-It was passed.
+It passed its defined constitutional compliance criteria.
 
 9. FINAL STATEMENT
-AVCS was designed to detect drift — the silent normalization of small deviations.
+AVCS was designed to detect drift — the silent normalization of small architectural deviations.
 
-The first real drift occurred inside AVCS itself.
+The first recorded drift occurred inside AVCS itself.
 
-That is not failure. That is validation.
+The implementation was tested against its governing Constitution without modifying the Constitution to accommodate the implementation.
 
-The system detected its own deviation before it became catastrophic.
+The divergence was recorded as a test result.
 
-The system applied its own doctrine to itself.
+The non-conforming implementation was reconciled against the constitutional architecture.
 
-The Constitution remains unchanged.
-The implementation is reconciled.
+The Constitution remained unchanged.
+
+This test does not constitute external validation of AVCS.
+
+It constitutes evidence of self-application:
+
+AVCS detected, recorded, and reconciled structural divergence within its own implementation using its own governing principles.
+
+The test passed its defined constitutional compliance criteria.
+
 The record is preserved.
 
 AVCS — Adaptive Vector Control System
