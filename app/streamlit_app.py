@@ -280,7 +280,7 @@ class SemanticEventNormalizer:
 
 
 # ===========================================================================
-# STREAMLIT UI — v0.5.1 Constitution-Aligned Sequential
+# STREAMLIT UI — v0.5.2 Constitution-Aligned Sequential
 # ===========================================================================
 
 st.set_page_config(page_title="AVCS Virtual Company", page_icon="🧭", layout="wide")
@@ -458,7 +458,7 @@ with tab1:
                 st.json(st.session_state.event_data["critical_conditions"])
 
 # ===========================================================================
-# TAB 2: PROCESSING — SEQUENTIAL EXECUTION (v0.5.1)
+# TAB 2: PROCESSING — SEQUENTIAL EXECUTION (v0.5.2)
 # ===========================================================================
 
 with tab2:
