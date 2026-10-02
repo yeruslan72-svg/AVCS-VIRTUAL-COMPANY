@@ -374,6 +374,6 @@ Where this Catalog and any governing document appear to conflict, the **governin
 **AVCS — Adaptive Vector Control System**
 **Structural Integrity for Decisions Under Pressure**
 
-**Author:** WISE (analytical instrument)
+**Author:** Yeruslan Chihachyov 
 **Date:** September 2026
 **Status:** Frozen — Version 1.0
