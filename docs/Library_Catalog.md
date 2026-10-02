@@ -375,5 +375,6 @@ Where this Catalog and any governing document appear to conflict, the **governin
 **Structural Integrity for Decisions Under Pressure**
 
 **Author:** Yeruslan Chihachyov 
+the Founder is the issuing authority (Charter §10)
 **Date:** September 2026
 **Status:** Frozen — Version 1.0
